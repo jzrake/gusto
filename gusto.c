@@ -155,7 +155,7 @@ int gusto_vars_from_conserved(struct aux_variables *A, double U[8], double dA[4]
 
 
 
-void gusto_init(struct gusto_sim *sim)
+void gusto_generate_verts(struct gusto_sim *sim)
 {
   sim->num_rows = sim->user.N[0];
   sim->row_size = (int *) malloc(sim->num_rows * sizeof(int));
@@ -179,7 +179,7 @@ void gusto_init(struct gusto_sim *sim)
 
       struct mesh_vert p;
       p.x[0] = 0.0;
-      p.x[1] = R0 + n * dR;
+      p.x[1] = R0 + n * dR + 0.0 * sin(4 * M_PI * (z0 + i * dz));
       p.x[2] = 0.0;
       p.x[3] = z0 + i * dz;
 
@@ -192,17 +192,30 @@ void gusto_init(struct gusto_sim *sim)
       sim->verts[n][i] = p;
     }
   }
-
-  ARRAY_INIT(struct mesh_cell, sim->cells, sim->num_cells, sim->num_cells_max);
-  ARRAY_INIT(struct mesh_face, sim->faces, sim->num_faces, sim->num_faces_max);
-
-  sim->smallest_cell_length = 0.0;
 }
 
 
 
+#define VEC4_SUB(x,y) {0,x[1]-y[1],x[2]-y[2],x[3]-y[3]}
+#define VEC4_ADD(x,y) {0,x[1]+y[1],x[2]+y[2],x[3]+y[3]}
+#define VEC4_DOT(x,y) (x[1]*y[1]+x[2]*y[2]+x[3]*y[3])
+#define VEC4_MOD(x) sqrt(VEC4_DOT(x,x))
+#define VEC4_CROSS(x,y) {0,			\
+			 x[2]*y[3]-x[3]*y[2],	\
+			 x[3]*y[1]-x[1]*y[3],	\
+			 x[1]*y[2]-x[2]*y[1]}
+#define VEC4_NORMALIZE(x) do {					\
+    double norm = sqrt(x[1]*x[1] + x[2]*x[2] + x[3]*x[3]);	\
+    x[1] /= norm;						\
+    x[2] /= norm;						\
+    x[3] /= norm;						\
+  } while (0)
+
+
 void gusto_generate_cells(struct gusto_sim *sim)
 {
+  ARRAY_INIT(struct mesh_cell, sim->cells, sim->num_cells, sim->num_cells_max);
+
   sim->smallest_cell_length = 1.0;
   
   for (int n=0; n<sim->num_rows-1; ++n) {
@@ -214,18 +227,36 @@ void gusto_generate_cells(struct gusto_sim *sim)
       C.verts[1] = &sim->verts[n+0][i+1];
       C.verts[2] = &sim->verts[n+1][i+0];
       C.verts[3] = &sim->verts[n+1][i+1];
-      
-      double dR = (C.verts[2]->x[1] - C.verts[0]->x[1]);
-      double df = 1.0;
-      double dz = (C.verts[1]->x[3] - C.verts[0]->x[3]);
 
-      if (dR < sim->smallest_cell_length) sim->smallest_cell_length = dR;
-      if (dz < sim->smallest_cell_length) sim->smallest_cell_length = dz;
+      /*
+       * These vectors define the 2-forms on the cell. There are four, one for
+       * each corner.
+      */
+      double dR0[4] = VEC4_SUB(C.verts[2]->x, C.verts[0]->x);
+      double dR1[4] = VEC4_SUB(C.verts[3]->x, C.verts[1]->x);
+      double dz0[4] = VEC4_SUB(C.verts[1]->x, C.verts[0]->x);
+      double dz1[4] = VEC4_SUB(C.verts[3]->x, C.verts[2]->x);
+      double dphi[4] = {0, 0, 1, 0};
+      double dAf0[4] = VEC4_CROSS(dz0, dR0);
+      double dAf1[4] = VEC4_CROSS(dz0, dR1);
+      double dAf2[4] = VEC4_CROSS(dz1, dR0);
+      double dAf3[4] = VEC4_CROSS(dz1, dR1);
+      double dAR0[4] = VEC4_CROSS(dphi, dz0);
+      double dAR1[4] = VEC4_CROSS(dphi, dz1);
+      double dAz0[4] = VEC4_CROSS(dR0, dphi);
+      double dAz1[4] = VEC4_CROSS(dR1, dphi);
 
-      C.dA[0] = dR * df * dz;
-      C.dA[1] = df * dz;
-      C.dA[2] = dz * dR;
-      C.dA[3] = dR * df;
+      C.dA[1] = 0.50 * (VEC4_MOD(dAR0) + VEC4_MOD(dAR1));
+      C.dA[2] = 0.25 * (VEC4_MOD(dAf0) + VEC4_MOD(dAf1) +
+			VEC4_MOD(dAf2) + VEC4_MOD(dAf3));
+      C.dA[3] = 0.50 * (VEC4_MOD(dAz0) + VEC4_MOD(dAz1));
+      C.dA[0] = C.dA[2]; /* Volume and phi cross section are the same */
+
+      double dAR = gusto_min3(VEC4_MOD(dAR0), VEC4_MOD(dAR1), 1.0);
+      double dAz = gusto_min3(VEC4_MOD(dAz0), VEC4_MOD(dAz1), 1.0);
+
+      if (dAR < sim->smallest_cell_length) sim->smallest_cell_length = dAR;
+      if (dAz < sim->smallest_cell_length) sim->smallest_cell_length = dAz;
 
       ARRAY_APPEND(struct mesh_cell,
 		   sim->cells, sim->num_cells, sim->num_cells_max, C);
@@ -248,6 +279,8 @@ void gusto_generate_cells(struct gusto_sim *sim)
 
 void gusto_generate_faces(struct gusto_sim *sim)
 {
+  ARRAY_INIT(struct mesh_face, sim->faces, sim->num_faces, sim->num_faces_max);
+
   /* R faces */
   for (int n=0; n<sim->num_rows; ++n) {
     for (int i=0; i<sim->row_size[n]-1; ++i) {
@@ -257,16 +290,16 @@ void gusto_generate_faces(struct gusto_sim *sim)
       F.verts[1] = &sim->verts[n][i+1];
       F.cells[0] = n == 0 ? NULL : sim->verts[n-1][i].cell;
       F.cells[1] =                 sim->verts[n+0][i].cell; /* could be NULL */
+      
+      double df[4] = {0, 0, 1, 0};
+      double dz[4] = VEC4_SUB(F.verts[1]->x, F.verts[0]->x);
+      double dA[4] = VEC4_CROSS(df, dz);
 
-      double dz = F.verts[1]->x[2] - F.verts[0]->x[2];
-      F.area = dz;
+      F.area = VEC4_MOD(dA);
       F.nhat[0] = 0.0;
-      F.nhat[1] = 1.0;
-      F.nhat[2] = 0.0;
-      F.nhat[3] = 0.0;
-      for (int q=0; q<8; ++q) {
-	F.Fhat[q] = 0.0;
-      }
+      F.nhat[1] = dA[1] / F.area;
+      F.nhat[2] = dA[2] / F.area;
+      F.nhat[3] = dA[3] / F.area;     
 	 
       ARRAY_APPEND(struct mesh_face,
 		   sim->faces, sim->num_faces, sim->num_faces_max, F);
@@ -282,16 +315,16 @@ void gusto_generate_faces(struct gusto_sim *sim)
       F.verts[1] = &sim->verts[n+1][i];
       F.cells[0] = i == 0 ? NULL : sim->verts[n][i-1].cell;
       F.cells[1] =                 sim->verts[n][i+0].cell; /* could be NULL */
-      
-      double dR = F.verts[1]->x[1] - F.verts[0]->x[1];
-      F.area = dR;
+
+      double df[4] = {0, 0, 1, 0};
+      double dR[4] = VEC4_SUB(F.verts[1]->x, F.verts[0]->x);
+      double dA[4] = VEC4_CROSS(dR, df);
+
+      F.area = VEC4_MOD(dA);
       F.nhat[0] = 0.0;
-      F.nhat[1] = 0.0;
-      F.nhat[2] = 0.0;
-      F.nhat[3] = 1.0;
-      for (int q=0; q<8; ++q) {
-	F.Fhat[q] = 0.0;
-      }
+      F.nhat[1] = dA[1] / F.area;
+      F.nhat[2] = dA[2] / F.area;
+      F.nhat[3] = dA[3] / F.area;
 
       ARRAY_APPEND(struct mesh_face,
 		   sim->faces, sim->num_faces, sim->num_faces_max, F);
@@ -570,14 +603,13 @@ int main(int argc, char **argv)
 
 
   gusto_user_report(&sim.user);
-  gusto_init(&sim);
-
+  gusto_generate_verts(&sim);
   gusto_generate_cells(&sim);
   gusto_generate_faces(&sim);
   gusto_initial_data(&sim);
 
 
-  double dt = 0.5 * sim.smallest_cell_length;
+  double dt = 0.25 * sim.smallest_cell_length;
 
   while (sim.status.time_simulation < sim.user.tmax) {
 
@@ -590,10 +622,11 @@ int main(int argc, char **argv)
     sim.status.iteration += 1;
   }
 
-  gusto_read_write_status(&sim.status, "chkpt.0000.h5", 'w');
-  gusto_read_write_user(&sim.user, "chkpt.0000.h5", 'a');
   gusto_write_to_ascii(&sim);
-  
+  gusto_write_checkpoint(&sim, "chkpt.0000.h5");
+  gusto_read_write_status(&sim.status, "chkpt.0000.h5", 'a');
+  gusto_read_write_user(&sim.user, "chkpt.0000.h5", 'a');
+
   gusto_free(&sim);
   return 0;
 }
