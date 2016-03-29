@@ -15,7 +15,7 @@ HDF5_L = -L$(HDF5_HOME)/lib -lhdf5
 endif
 
 
-SRC = gusto.c ser.c quartic.c srmhd_c2p.c
+SRC = gusto.c ser.c quartic.c srmhd_c2p.c chkpt.c
 OBJ = $(SRC:.c=.o)
 APP = gusto
 HEADERS = gusto.h
