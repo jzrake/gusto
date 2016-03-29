@@ -1,0 +1,25 @@
+# ----------------------------------------------------------
+# Compiler configuration
+# ----------------------------------------------------------
+CC = gcc
+CFLAGS = -std=c99 -Wall -O0 -g
+CCMM = $(CC)
+CLIBS = -lm
+AR = ar rcu
+RANLIB = ranlib
+JINJA2 = python build.py $< | gindent -kr
+
+
+# ----------------------------------------------------------
+# Optional dependencies (set to 1 if available)
+# ----------------------------------------------------------
+HAVE_MPI = 1
+HAVE_HDF5 = 1
+
+
+# ----------------------------------------------------------
+# System library directories
+# ----------------------------------------------------------
+HDF5_HOME = /users/jzrake/Software/hdf5-1.8.10
+
+
