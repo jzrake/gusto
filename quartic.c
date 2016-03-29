@@ -11,7 +11,7 @@
 #include <math.h>
 #include <complex.h>
 
-static int do_root_polish = 1;
+static int do_root_polish = 0;
 static void polish_newton(double as[4], double roots[4], int good[4]);
 
 int solve_quartic_equation(double d4, double d3,

@@ -6,6 +6,30 @@
 #include "quartic.h"
 
 
+#include <sys/time.h>
+
+void *gusto_start_clock()
+{
+  struct timeval *T = (struct timeval *) malloc(sizeof(struct timeval));
+  gettimeofday(T, NULL);
+  return T;
+}
+
+double gusto_stop_clock(void *clock_s)
+{
+  struct timeval *T0 = (struct timeval *) clock_s;
+  struct timeval *T1 = (struct timeval *) malloc(sizeof(struct timeval));
+  gettimeofday(T1, NULL);
+  double ds = T1->tv_sec  - T0->tv_sec;
+  double du = T1->tv_usec - T0->tv_usec;
+  double dt = ds + 1e-6*du;
+  free(T0);
+  free(T1);
+  return dt;
+}
+
+
+
 void gusto_vars_complete_aux(struct aux_variables *A);
 
 
@@ -491,7 +515,7 @@ void gusto_riemann(struct aux_variables *AL,
   double FL[8];
   double FR[8];
   double dA_unit[4] = {1, 1, 1, 1};
-  
+
   gusto_wavespeeds(AL, nhat, lamL);
   gusto_wavespeeds(AR, nhat, lamR);
   gusto_vars_to_conserved(AL, UL, dA_unit);
@@ -651,14 +675,28 @@ int main(int argc, char **argv)
 
 
   double dt = 0.25 * sim.smallest_cell_length;
+  sim.status.time_step = dt;
 
   while (sim.status.time_simulation < sim.user.tmax) {
+
+    void *start_cycle = gusto_start_clock();
 
     gusto_compute_fluxes(&sim);
     gusto_transmit_fluxes(&sim, dt);
     gusto_recover_variables(&sim);
- 
-    printf("%06d: t=%6.4f\n", sim.status.iteration, sim.status.time_simulation);
+
+    double seconds = gusto_stop_clock(start_cycle);
+
+    sim.status.kzps = 1e-3 * sim.num_cells / seconds;
+
+    if (sim.status.iteration % 1 == 0) {
+      printf("[ffe] n=%06d t=%6.4e dt=%6.4e %3.2f kzps\n",
+	     sim.status.iteration,
+	     sim.status.time_simulation,
+	     sim.status.time_step,
+	     sim.status.kzps);
+    }
+    
     sim.status.time_simulation += dt;
     sim.status.iteration += 1;
   }
