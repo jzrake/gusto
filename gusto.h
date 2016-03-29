@@ -63,6 +63,8 @@ struct gusto_sim
   int num_rows;
   int *row_size;
 
+  double smallest_cell_length; /* for CFL condition */
+  
   struct mesh_vert **verts;
   struct mesh_face *faces;
   struct mesh_cell *cells;

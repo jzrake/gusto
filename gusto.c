@@ -6,6 +6,29 @@
 #include "quartic.h"
 
 
+void gusto_vars_complete_aux(struct aux_variables *A);
+
+
+void initial_data_function(struct aux_variables *A, double *X)
+{
+  A->velocity_four_vector[1] = 0.0;
+  A->velocity_four_vector[2] = 0.0;
+  A->velocity_four_vector[3] = 0.0;
+  A->magnetic_four_vector[1] = 0.0;
+  A->magnetic_four_vector[2] = 0.0;
+  A->magnetic_four_vector[3] = 0.0;
+  if (X[3] < 0.5) {
+    A->comoving_mass_density = 1.0;
+    A->gas_pressure = 1.0;
+  }
+  else {
+    A->comoving_mass_density = 0.1;
+    A->gas_pressure = 0.125;
+  }
+  gusto_vars_complete_aux(A);
+}
+
+
 
 void gusto_vars_complete_aux(struct aux_variables *A)
 /*
@@ -132,21 +155,6 @@ int gusto_vars_from_conserved(struct aux_variables *A, double U[8], double dA[4]
 
 
 
-void initial_data_function(struct aux_variables *A, double *X)
-{
-  A->velocity_four_vector[1] = 0.0;
-  A->velocity_four_vector[2] = 0.0;
-  A->velocity_four_vector[3] = 0.0;
-  A->magnetic_four_vector[1] = 0.0;
-  A->magnetic_four_vector[2] = 0.0;
-  A->magnetic_four_vector[3] = 0.0;
-  A->comoving_mass_density = 1.0;
-  A->gas_pressure = 1.0;
-  gusto_vars_complete_aux(A);
-}
-
-
-
 void gusto_init(struct gusto_sim *sim)
 {
   sim->num_rows = sim->user.N[0];
@@ -166,17 +174,19 @@ void gusto_init(struct gusto_sim *sim)
       double R1 = 1.0;
       double z0 = 0.0;
       double z1 = 1.0;
-      double dR = (R1 - R0) / (sim->row_size[n] - 1);
-      double dz = (z1 - z0) / (sim->num_rows - 1);
+      double dR = (R1 - R0) / (sim->num_rows - 1);
+      double dz = (z1 - z0) / (sim->row_size[n] - 1);
 
       struct mesh_vert p;
       p.x[0] = 0.0;
       p.x[1] = R0 + n * dR;
-      p.x[2] = z0 + i * dz;
+      p.x[2] = 0.0;
+      p.x[3] = z0 + i * dz;
 
       p.u[0] = 0.0;
       p.u[1] = 0.0;
       p.u[2] = 0.0;
+      p.u[3] = 0.0;
       p.cell = NULL;
       
       sim->verts[n][i] = p;
@@ -185,12 +195,16 @@ void gusto_init(struct gusto_sim *sim)
 
   ARRAY_INIT(struct mesh_cell, sim->cells, sim->num_cells, sim->num_cells_max);
   ARRAY_INIT(struct mesh_face, sim->faces, sim->num_faces, sim->num_faces_max);
+
+  sim->smallest_cell_length = 0.0;
 }
 
 
 
 void gusto_generate_cells(struct gusto_sim *sim)
 {
+  sim->smallest_cell_length = 1.0;
+  
   for (int n=0; n<sim->num_rows-1; ++n) {
     for (int i=0; i<sim->row_size[n]-1; ++i) {
 
@@ -203,8 +217,11 @@ void gusto_generate_cells(struct gusto_sim *sim)
       
       double dR = (C.verts[2]->x[1] - C.verts[0]->x[1]);
       double df = 1.0;
-      double dz = (C.verts[1]->x[2] - C.verts[0]->x[2]);
-      
+      double dz = (C.verts[1]->x[3] - C.verts[0]->x[3]);
+
+      if (dR < sim->smallest_cell_length) sim->smallest_cell_length = dR;
+      if (dz < sim->smallest_cell_length) sim->smallest_cell_length = dz;
+
       C.dA[0] = dR * df * dz;
       C.dA[1] = df * dz;
       C.dA[2] = dz * dR;
@@ -222,7 +239,7 @@ void gusto_generate_cells(struct gusto_sim *sim)
       j += 1;
     }
   }
-  
+ 
   printf("num_cells: %d\n", sim->num_cells);
   printf("num_cells_max: %d\n", sim->num_cells_max);
 }
@@ -309,8 +326,8 @@ void gusto_initial_data(struct gusto_sim *sim)
     double *X2 = sim->cells[j].verts[2]->x;
     double *X3 = sim->cells[j].verts[3]->x;   
     double R = 0.25 * (X0[1] + X1[1] + X2[1] + X3[1]);
-    double z = 0.25 * (X0[2] + X1[2] + X2[2] + X3[2]);
-    double X[4] = {0, R, z, 0};
+    double z = 0.25 * (X0[3] + X1[3] + X2[3] + X3[3]);
+    double X[4] = {0, R, 0, z};
     struct aux_variables *A = &sim->cells[j].aux[0];
     initial_data_function(A, X);
     gusto_vars_to_conserved(A, sim->cells[j].U, sim->cells[j].dA);
@@ -434,12 +451,12 @@ void gusto_riemann(struct aux_variables *AL,
 		   double nhat[4],
 		   double Fhat[8])
 {
-  double lamL[8] = {0,0,0,0,0,0,0,0};
-  double lamR[8] = {0,0,0,0,0,0,0,0};
-  double UL[8] = {0,0,0,0,0,0,0,0};
-  double UR[8] = {0,0,0,0,0,0,0,0};
-  double FL[8] = {0,0,0,0,0,0,0,0};
-  double FR[8] = {0,0,0,0,0,0,0,0};
+  double lamL[8];
+  double lamR[8];
+  double UL[8];
+  double UR[8];
+  double FL[8];
+  double FR[8];
   double dA_unit[4] = {1, 1, 1, 1};
   
   gusto_wavespeeds(AL, nhat, lamL);
@@ -494,11 +511,9 @@ void gusto_transmit_fluxes(struct gusto_sim *sim, double dt)
     struct mesh_face *face = &sim->faces[j];
     struct mesh_cell *CL = face->cells[0];
     struct mesh_cell *CR = face->cells[1];
-    if (CL && CR) {
-      for (int q=0; q<8; ++q) {
-	CL->U[q] -= face->Fhat[q] * face->area * dt;
-	CR->U[q] += face->Fhat[q] * face->area * dt;
-      }
+    for (int q=0; q<8; ++q) {
+      if (CL) CL->U[q] -= face->Fhat[q] * face->area * dt;
+      if (CR) CR->U[q] += face->Fhat[q] * face->area * dt;
     }    
   }
 }
@@ -511,6 +526,29 @@ void gusto_recover_variables(struct gusto_sim *sim)
     struct mesh_cell *C = &sim->cells[j];
     gusto_vars_from_conserved(C->aux, C->U, C->dA);
   }
+}
+
+
+
+void gusto_write_to_ascii(struct gusto_sim *sim)
+{
+  FILE *outf = fopen("gusto.dat", "w");
+  for (int j=0; j<sim->num_cells; ++j) {
+    struct mesh_cell *C = &sim->cells[j];
+    double *u = C->aux[0].velocity_four_vector;
+    double *b = C->aux[0].magnetic_four_vector;
+    double z = 0.25 * (C->verts[0]->x[3] + C->verts[1]->x[3] +
+		       C->verts[2]->x[3] + C->verts[3]->x[3]);
+    fprintf(outf, "%f "
+	    "%f %f %f %f "
+	    "%f %f %f %f "
+	    "%f %f\n", z,
+	    u[0], u[1], u[2], u[3],
+	    b[0], b[1], b[2], b[3],
+	    C->aux[0].comoving_mass_density,
+	    C->aux[0].gas_pressure);
+  }
+  fclose(outf);
 }
 
 
@@ -530,20 +568,32 @@ int main(int argc, char **argv)
     gusto_user_set_from_arg(&sim.user, argv[n]);
   }
 
-  
+
   gusto_user_report(&sim.user);
   gusto_init(&sim);
 
   gusto_generate_cells(&sim);
   gusto_generate_faces(&sim);
   gusto_initial_data(&sim);
-  gusto_compute_fluxes(&sim);
-  gusto_transmit_fluxes(&sim, 1e-3);
-  gusto_recover_variables(&sim);
+
+
+  double dt = 0.5 * sim.smallest_cell_length;
+
+  while (sim.status.time_simulation < sim.user.tmax) {
+
+    gusto_compute_fluxes(&sim);
+    gusto_transmit_fluxes(&sim, dt);
+    gusto_recover_variables(&sim);
+ 
+    printf("%06d: t=%6.4f\n", sim.status.iteration, sim.status.time_simulation);
+    sim.status.time_simulation += dt;
+    sim.status.iteration += 1;
+  }
 
   gusto_read_write_status(&sim.status, "chkpt.0000.h5", 'w');
   gusto_read_write_user(&sim.user, "chkpt.0000.h5", 'a');
-
+  gusto_write_to_ascii(&sim);
+  
   gusto_free(&sim);
   return 0;
 }

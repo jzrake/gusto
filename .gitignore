@@ -1,0 +1,7 @@
+/gusto
+/gusto.dSYM
+/Makefile.in
+/*.o
+
+*.h5
+*.dat
