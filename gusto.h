@@ -32,12 +32,10 @@ struct mesh_vert
 
 struct mesh_face
 {
-  double area;
-  double Fhat[8];
-  double nhat[4];
+  double Fhat[8]; /* Godunov fluxes */
+  double nhat[4]; /* 0: face area, 1,2,3: unit normal */
   struct mesh_vert *verts[2];
   struct mesh_cell *cells[2];
-  //struct aux_variables aux[3];
 } ;
 
 

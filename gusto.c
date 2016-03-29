@@ -17,7 +17,9 @@ void initial_data_function(struct aux_variables *A, double *X)
   A->magnetic_four_vector[1] = 0.0;
   A->magnetic_four_vector[2] = 0.0;
   A->magnetic_four_vector[3] = 0.0;
-  if (X[3] < 0.5) {
+  double x = X[1] - 0.5;
+  double y = X[3] - 0.5;
+  if (sqrt(x*x + y*y) < 0.125) {
     A->comoving_mass_density = 1.0;
     A->gas_pressure = 1.0;
   }
@@ -179,7 +181,7 @@ void gusto_generate_verts(struct gusto_sim *sim)
 
       struct mesh_vert p;
       p.x[0] = 0.0;
-      p.x[1] = R0 + n * dR + 0.0 * sin(4 * M_PI * (z0 + i * dz));
+      p.x[1] = R0 + n * dR + 0.05 * sin(4 * M_PI * (z0 + i * dz));
       p.x[2] = 0.0;
       p.x[3] = z0 + i * dz;
 
@@ -295,11 +297,10 @@ void gusto_generate_faces(struct gusto_sim *sim)
       double dz[4] = VEC4_SUB(F.verts[1]->x, F.verts[0]->x);
       double dA[4] = VEC4_CROSS(df, dz);
 
-      F.area = VEC4_MOD(dA);
-      F.nhat[0] = 0.0;
-      F.nhat[1] = dA[1] / F.area;
-      F.nhat[2] = dA[2] / F.area;
-      F.nhat[3] = dA[3] / F.area;     
+      F.nhat[0] = VEC4_MOD(dA);
+      F.nhat[1] = dA[1] / F.nhat[0];
+      F.nhat[2] = dA[2] / F.nhat[0];
+      F.nhat[3] = dA[3] / F.nhat[0];
 	 
       ARRAY_APPEND(struct mesh_face,
 		   sim->faces, sim->num_faces, sim->num_faces_max, F);
@@ -320,11 +321,10 @@ void gusto_generate_faces(struct gusto_sim *sim)
       double dR[4] = VEC4_SUB(F.verts[1]->x, F.verts[0]->x);
       double dA[4] = VEC4_CROSS(dR, df);
 
-      F.area = VEC4_MOD(dA);
-      F.nhat[0] = 0.0;
-      F.nhat[1] = dA[1] / F.area;
-      F.nhat[2] = dA[2] / F.area;
-      F.nhat[3] = dA[3] / F.area;
+      F.nhat[0] = VEC4_MOD(dA);
+      F.nhat[1] = dA[1] / F.nhat[0];
+      F.nhat[2] = dA[2] / F.nhat[0];
+      F.nhat[3] = dA[3] / F.nhat[0];
 
       ARRAY_APPEND(struct mesh_face,
 		   sim->faces, sim->num_faces, sim->num_faces_max, F);
@@ -545,8 +545,8 @@ void gusto_transmit_fluxes(struct gusto_sim *sim, double dt)
     struct mesh_cell *CL = face->cells[0];
     struct mesh_cell *CR = face->cells[1];
     for (int q=0; q<8; ++q) {
-      if (CL) CL->U[q] -= face->Fhat[q] * face->area * dt;
-      if (CR) CR->U[q] += face->Fhat[q] * face->area * dt;
+      if (CL) CL->U[q] -= face->Fhat[q] * face->nhat[0] * dt;
+      if (CR) CR->U[q] += face->Fhat[q] * face->nhat[0] * dt;
     }    
   }
 }
@@ -558,6 +558,47 @@ void gusto_recover_variables(struct gusto_sim *sim)
   for (int j=0; j<sim->num_cells; ++j) {
     struct mesh_cell *C = &sim->cells[j];
     gusto_vars_from_conserved(C->aux, C->U, C->dA);
+  }
+}
+
+
+
+void gusto_compute_variables_at_vertices(struct gusto_sim *sim)
+{
+  for (int n=0; n<sim->num_rows; ++n) {
+    for (int i=0; i<sim->row_size[n]; ++i) {
+      for (int d=1; d<4; ++d) {
+	sim->verts[n][i].aux[0].velocity_four_vector[d] = 0.0;
+	sim->verts[n][i].aux[0].magnetic_four_vector[d] = 0.0;
+      }
+      sim->verts[n][i].aux[0].comoving_mass_density = 0.0;
+      sim->verts[n][i].aux[0].gas_pressure = 0.0;
+    }
+  }
+  
+  for (int j=0; j<sim->num_cells; ++j) {
+    struct mesh_cell *C = &sim->cells[j];
+    for (int v=0; v<4; ++v) {
+      struct aux_variables *A = &C->verts[v]->aux[0];
+      for (int d=1; d<4; ++d) {
+	A->velocity_four_vector[d] += C->aux[0].velocity_four_vector[d];
+	A->magnetic_four_vector[d] += C->aux[0].magnetic_four_vector[d];
+      }
+      A->comoving_mass_density += C->aux[0].comoving_mass_density;
+      A->gas_pressure += C->aux[0].gas_pressure;
+    }
+  }
+
+  for (int n=0; n<sim->num_rows; ++n) {
+    for (int i=0; i<sim->row_size[n]; ++i) {
+      for (int d=1; d<4; ++d) {
+	sim->verts[n][i].aux[0].velocity_four_vector[d] /= 4;
+	sim->verts[n][i].aux[0].magnetic_four_vector[d] /= 4;
+      }
+      sim->verts[n][i].aux[0].comoving_mass_density /= 4;
+      sim->verts[n][i].aux[0].gas_pressure /= 4;
+      gusto_vars_complete_aux(&sim->verts[n][i].aux[0]);
+    }
   }
 }
 
@@ -622,6 +663,7 @@ int main(int argc, char **argv)
     sim.status.iteration += 1;
   }
 
+  gusto_compute_variables_at_vertices(&sim);
   gusto_write_to_ascii(&sim);
   gusto_write_checkpoint(&sim, "chkpt.0000.h5");
   gusto_read_write_status(&sim.status, "chkpt.0000.h5", 'a');
