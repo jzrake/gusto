@@ -5,11 +5,9 @@ import h5py
 def plot_ascii_1d():
     A = np.loadtxt('gusto.dat')
     x3 = A[:,0]
-    u3 = A[:,4]
     dg = A[:,9]
 
-    plt.plot(x3, u3)
-    plt.plot(x3, dg)
+    plt.plot(x3, dg, '-o')
     plt.show()
 
 
@@ -43,4 +41,4 @@ def plot_h5():
     plt.show()
 
 
-plot_h5()
+plot_ascii_1d()

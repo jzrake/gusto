@@ -24,7 +24,7 @@ struct aux_variables
 struct mesh_vert
 {
   double x[4];
-  double u[4];
+  double v[4];
   struct aux_variables aux[4];
   struct mesh_cell *cell;
 } ;
@@ -42,8 +42,9 @@ struct mesh_face
 struct mesh_cell
 {
   struct mesh_vert *verts[4];
-  double dA[4]; /* volume, dA1, dA2, dA3 */
-  double U[8]; /* total mass, energy, momentum, magnetic flux */
+  double dA[4];                /* 0: volume, dA1, dA2, dA3: cross-sections */
+  double zhat[4];              /* 1,2,3: cell's longitudinal axis (unit) */
+  double U[8];                 /* total mass, energy, momentum, magnetic flux */
   struct aux_variables aux[5]; /* aux vars at different cell locations */
 } ;
 
@@ -62,7 +63,7 @@ struct gusto_sim
   int *row_size;
 
   double smallest_cell_length; /* for CFL condition */
-  
+
   struct mesh_vert **verts;
   struct mesh_face *faces;
   struct mesh_cell *cells;
@@ -110,4 +111,4 @@ void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname);
 #define gusto_min3(a,b,c)(((a)<(b))?(((a)<(c))?(a):(c)):(((b)<(c))?(b):(c)))
 
 
-#endif // GUSTO_HEADER
+#endif /* GUSTO_HEADER */

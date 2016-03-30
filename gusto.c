@@ -28,12 +28,28 @@ double gusto_stop_clock(void *clock_s)
   return dt;
 }
 
+#define VEC4_SUB(x,y) {0,x[1]-y[1],x[2]-y[2],x[3]-y[3]}
+#define VEC4_ADD(x,y) {0,x[1]+y[1],x[2]+y[2],x[3]+y[3]}
+#define VEC4_DOT(x,y) (x[1]*y[1]+x[2]*y[2]+x[3]*y[3])
+#define VEC4_MOD(x) sqrt(VEC4_DOT(x,x))
+#define VEC4_CROSS(x,y) {0,			\
+			 x[2]*y[3]-x[3]*y[2],	\
+			 x[3]*y[1]-x[1]*y[3],	\
+			 x[1]*y[2]-x[2]*y[1]}
+#define VEC4_NORMALIZE(x) do {					\
+    double norm = sqrt(x[1]*x[1] + x[2]*x[2] + x[3]*x[3]);	\
+    x[1] /= norm;						\
+    x[2] /= norm;						\
+    x[3] /= norm;						\
+  } while (0)
+
+
 
 
 void gusto_vars_complete_aux(struct aux_variables *A);
 
 
-void initial_data_function(struct aux_variables *A, double *X)
+void initial_data_cylindrical_shock(struct aux_variables *A, double *X)
 {
   A->velocity_four_vector[1] = 0.0;
   A->velocity_four_vector[2] = 0.0;
@@ -49,8 +65,41 @@ void initial_data_function(struct aux_variables *A, double *X)
   }
   else {
     A->comoving_mass_density = 0.1;
-    A->gas_pressure = 1.0;//0.125;
+    A->gas_pressure = 1.0;
   }
+  gusto_vars_complete_aux(A);
+}
+
+
+
+void initial_data_sound_wave(struct aux_variables *A, double *X)
+{
+  double k = 2 * M_PI;
+  double z = X[3];
+
+  double gm = gamma_law_index;
+  double d0 = 1.0;
+  double p0 = 1.0;
+  double u0 = 0.0;
+  double h0 = 1.0 + (p0/d0) * gm / (gm - 1);
+  double cs = sqrt(gm * p0 / d0 / h0);
+  double dd = 0.1;
+  double dp = cs * cs * dd;
+  double du = cs * dd / d0;
+
+  double d = d0 + dd * sin(k * z);
+  double p = p0 + dp * sin(k * z);
+  double u = u0 + du * sin(k * z);
+
+  A->velocity_four_vector[1] = u;
+  A->velocity_four_vector[2] = 0.0;
+  A->velocity_four_vector[3] = 0.0;
+  A->magnetic_four_vector[1] = 0.0;
+  A->magnetic_four_vector[2] = 0.0;
+  A->magnetic_four_vector[3] = 0.0;
+  A->comoving_mass_density = d;
+  A->gas_pressure = p;
+
   gusto_vars_complete_aux(A);
 }
 
@@ -69,7 +118,7 @@ void gusto_vars_complete_aux(struct aux_variables *A)
   double *b = A->magnetic_four_vector;
   double uu3 = u[1]*u[1] + u[2]*u[2] + u[3]*u[3];
   double ub3 = u[1]*b[1] + u[2]*b[2] + u[3]*b[3];
-  
+
   u[0] = sqrt(1.0 + uu3);
   b[0] = u[0] * ub3 / (1 + u[0] * uu3);
 
@@ -196,46 +245,35 @@ void gusto_generate_verts(struct gusto_sim *sim)
 
     for (int i=0; i<sim->row_size[n]; ++i) {
 
+      int ng = 1; /* number of ghost cells */
+      int num_interior = sim->row_size[n] - 2 * ng;
+      int i_real = i - ng;
+
       double R0 = 0.0;
       double R1 = 1.0;
       double z0 = 0.0;
       double z1 = 1.0;
       double dR = (R1 - R0) / (sim->num_rows - 1);
-      double dz = (z1 - z0) / (sim->row_size[n] - 1);
+      double dz = (z1 - z0) / (num_interior - 1);
 
-      struct mesh_vert p;
-      p.x[0] = 0.0;
-      p.x[1] = R0 + n * dR + 0.05 * sin(4 * M_PI * (z0 + i * dz));
-      p.x[2] = 0.0;
-      p.x[3] = z0 + i * dz;
+      struct mesh_vert V;
+      V.x[0] = 0.0;
+      V.x[1] = R0 + n * dR + 0.0 * sin(4 * M_PI * (z0 + i * dz));
+      V.x[2] = 0.0;
+      V.x[3] = z0 + i_real * dz;
 
-      p.u[0] = 0.0;
-      p.u[1] = 0.0;
-      p.u[2] = 0.0;
-      p.u[3] = 0.0;
-      p.cell = NULL;
+      V.v[0] = 0.0;
+      V.v[1] = 0.0;
+      V.v[2] = 0.0;
+      V.v[3] = 0.0;
+
+      V.cell = NULL;
       
-      sim->verts[n][i] = p;
+      sim->verts[n][i] = V;
     }
   }
 }
 
-
-
-#define VEC4_SUB(x,y) {0,x[1]-y[1],x[2]-y[2],x[3]-y[3]}
-#define VEC4_ADD(x,y) {0,x[1]+y[1],x[2]+y[2],x[3]+y[3]}
-#define VEC4_DOT(x,y) (x[1]*y[1]+x[2]*y[2]+x[3]*y[3])
-#define VEC4_MOD(x) sqrt(VEC4_DOT(x,x))
-#define VEC4_CROSS(x,y) {0,			\
-			 x[2]*y[3]-x[3]*y[2],	\
-			 x[3]*y[1]-x[1]*y[3],	\
-			 x[1]*y[2]-x[2]*y[1]}
-#define VEC4_NORMALIZE(x) do {					\
-    double norm = sqrt(x[1]*x[1] + x[2]*x[2] + x[3]*x[3]);	\
-    x[1] /= norm;						\
-    x[2] /= norm;						\
-    x[3] /= norm;						\
-  } while (0)
 
 
 void gusto_generate_cells(struct gusto_sim *sim)
@@ -243,7 +281,7 @@ void gusto_generate_cells(struct gusto_sim *sim)
   ARRAY_INIT(struct mesh_cell, sim->cells, sim->num_cells, sim->num_cells_max);
 
   sim->smallest_cell_length = 1.0;
-  
+
   for (int n=0; n<sim->num_rows-1; ++n) {
     for (int i=0; i<sim->row_size[n]-1; ++i) {
 
@@ -253,36 +291,6 @@ void gusto_generate_cells(struct gusto_sim *sim)
       C.verts[1] = &sim->verts[n+0][i+1];
       C.verts[2] = &sim->verts[n+1][i+0];
       C.verts[3] = &sim->verts[n+1][i+1];
-
-      /*
-       * These vectors define the 2-forms on the cell. There are four, one for
-       * each corner.
-      */
-      double dR0[4] = VEC4_SUB(C.verts[2]->x, C.verts[0]->x);
-      double dR1[4] = VEC4_SUB(C.verts[3]->x, C.verts[1]->x);
-      double dz0[4] = VEC4_SUB(C.verts[1]->x, C.verts[0]->x);
-      double dz1[4] = VEC4_SUB(C.verts[3]->x, C.verts[2]->x);
-      double dphi[4] = {0, 0, 1, 0};
-      double dAf0[4] = VEC4_CROSS(dz0, dR0);
-      double dAf1[4] = VEC4_CROSS(dz0, dR1);
-      double dAf2[4] = VEC4_CROSS(dz1, dR0);
-      double dAf3[4] = VEC4_CROSS(dz1, dR1);
-      double dAR0[4] = VEC4_CROSS(dphi, dz0);
-      double dAR1[4] = VEC4_CROSS(dphi, dz1);
-      double dAz0[4] = VEC4_CROSS(dR0, dphi);
-      double dAz1[4] = VEC4_CROSS(dR1, dphi);
-
-      C.dA[1] = 0.50 * (VEC4_MOD(dAR0) + VEC4_MOD(dAR1));
-      C.dA[2] = 0.25 * (VEC4_MOD(dAf0) + VEC4_MOD(dAf1) +
-			VEC4_MOD(dAf2) + VEC4_MOD(dAf3));
-      C.dA[3] = 0.50 * (VEC4_MOD(dAz0) + VEC4_MOD(dAz1));
-      C.dA[0] = C.dA[2]; /* Volume and phi cross section are the same */
-
-      double dAR = gusto_min3(VEC4_MOD(dAR0), VEC4_MOD(dAR1), 1.0);
-      double dAz = gusto_min3(VEC4_MOD(dAz0), VEC4_MOD(dAz1), 1.0);
-
-      if (dAR < sim->smallest_cell_length) sim->smallest_cell_length = dAR;
-      if (dAz < sim->smallest_cell_length) sim->smallest_cell_length = dAz;
 
       ARRAY_APPEND(struct mesh_cell,
 		   sim->cells, sim->num_cells, sim->num_cells_max, C);
@@ -316,16 +324,7 @@ void gusto_generate_faces(struct gusto_sim *sim)
       F.verts[1] = &sim->verts[n][i+1];
       F.cells[0] = n == 0 ? NULL : sim->verts[n-1][i].cell;
       F.cells[1] =                 sim->verts[n+0][i].cell; /* could be NULL */
-      
-      double df[4] = {0, 0, 1, 0};
-      double dz[4] = VEC4_SUB(F.verts[1]->x, F.verts[0]->x);
-      double dA[4] = VEC4_CROSS(df, dz);
 
-      F.nhat[0] = VEC4_MOD(dA);
-      F.nhat[1] = dA[1] / F.nhat[0];
-      F.nhat[2] = dA[2] / F.nhat[0];
-      F.nhat[3] = dA[3] / F.nhat[0];
-	 
       ARRAY_APPEND(struct mesh_face,
 		   sim->faces, sim->num_faces, sim->num_faces_max, F);
     }
@@ -341,15 +340,6 @@ void gusto_generate_faces(struct gusto_sim *sim)
       F.cells[0] = i == 0 ? NULL : sim->verts[n][i-1].cell;
       F.cells[1] =                 sim->verts[n][i+0].cell; /* could be NULL */
 
-      double df[4] = {0, 0, 1, 0};
-      double dR[4] = VEC4_SUB(F.verts[1]->x, F.verts[0]->x);
-      double dA[4] = VEC4_CROSS(dR, df);
-
-      F.nhat[0] = VEC4_MOD(dA);
-      F.nhat[1] = dA[1] / F.nhat[0];
-      F.nhat[2] = dA[2] / F.nhat[0];
-      F.nhat[3] = dA[3] / F.nhat[0];
-
       ARRAY_APPEND(struct mesh_face,
 		   sim->faces, sim->num_faces, sim->num_faces_max, F);
     }
@@ -357,6 +347,67 @@ void gusto_generate_faces(struct gusto_sim *sim)
   
   printf("num_faces: %d\n", sim->num_faces);
   printf("num_faces_max: %d\n", sim->num_faces_max);
+}
+
+
+
+void gusto_compute_mesh_geometry(struct gusto_sim *sim)
+{
+  for (int j=0; j<sim->num_faces; ++j) {
+    struct mesh_face *F = &sim->faces[j];
+
+    double df[4] = {0, 0, 1, 0};
+    double dl[4] = VEC4_SUB(F->verts[1]->x, F->verts[0]->x);
+    double dA[4] = VEC4_CROSS(dl, df);
+
+    F->nhat[0] = VEC4_MOD(dA);
+    F->nhat[1] = dA[1] / F->nhat[0];
+    F->nhat[2] = dA[2] / F->nhat[0];
+    F->nhat[3] = dA[3] / F->nhat[0];
+  }
+
+  for (int j=0; j<sim->num_cells; ++j) {
+
+    struct mesh_cell *C = &sim->cells[j];
+
+    /*
+     * These vectors define the 2-forms on the cell. There are four, one for
+     * each corner.
+     */
+    double dR0[4] = VEC4_SUB(C->verts[2]->x, C->verts[0]->x);
+    double dR1[4] = VEC4_SUB(C->verts[3]->x, C->verts[1]->x);
+    double dz0[4] = VEC4_SUB(C->verts[1]->x, C->verts[0]->x);
+    double dz1[4] = VEC4_SUB(C->verts[3]->x, C->verts[2]->x);
+    double dphi[4] = {0, 0, 1, 0};
+    double dAf0[4] = VEC4_CROSS(dz0, dR0);
+    double dAf1[4] = VEC4_CROSS(dz0, dR1);
+    double dAf2[4] = VEC4_CROSS(dz1, dR0);
+    double dAf3[4] = VEC4_CROSS(dz1, dR1);
+    double dAR0[4] = VEC4_CROSS(dphi, dz0);
+    double dAR1[4] = VEC4_CROSS(dphi, dz1);
+    double dAz0[4] = VEC4_CROSS(dR0, dphi);
+    double dAz1[4] = VEC4_CROSS(dR1, dphi);
+
+    C->dA[1] = 0.50 * (VEC4_MOD(dAR0) + VEC4_MOD(dAR1));
+    C->dA[2] = 0.25 * (VEC4_MOD(dAf0) + VEC4_MOD(dAf1) +
+		       VEC4_MOD(dAf2) + VEC4_MOD(dAf3));
+    C->dA[3] = 0.50 * (VEC4_MOD(dAz0) + VEC4_MOD(dAz1));
+    C->dA[0] = C->dA[2]; /* Volume and phi cross section are the same */
+
+    /* Cell's longitudinal axis */
+    C->zhat[0] = 0.0;
+    C->zhat[1] = 0.5 * (dAz0[1] + dAz1[1]);
+    C->zhat[2] = 0.5 * (dAz0[2] + dAz1[2]);
+    C->zhat[3] = 0.5 * (dAz0[3] + dAz1[3]);
+
+    VEC4_NORMALIZE(C->zhat);
+
+    double dAR = gusto_min3(VEC4_MOD(dAR0), VEC4_MOD(dAR1), 1.0);
+    double dAz = gusto_min3(VEC4_MOD(dAz0), VEC4_MOD(dAz1), 1.0);
+
+    if (dAR < sim->smallest_cell_length) sim->smallest_cell_length = dAR;
+    if (dAz < sim->smallest_cell_length) sim->smallest_cell_length = dAz;
+  }
 }
 
 
@@ -386,17 +437,8 @@ void gusto_initial_data(struct gusto_sim *sim)
     double z = 0.25 * (X0[3] + X1[3] + X2[3] + X3[3]);
     double X[4] = {0, R, 0, z};
     struct aux_variables *A = &sim->cells[j].aux[0];
-    initial_data_function(A, X);
+    initial_data_sound_wave(A, X);
     gusto_vars_to_conserved(A, sim->cells[j].U, sim->cells[j].dA);
-  }
-
-  /* set initial data on vertices */
-  for (int n=0; n<sim->num_rows; ++n) {
-    for (int i=0; i<sim->row_size[n]; ++i) {
-      double *X = sim->verts[n][i].x;
-      struct aux_variables *A = &sim->verts[n][i].aux[0];
-      initial_data_function(A, X);
-    }
   }
 }
 
@@ -554,20 +596,22 @@ void gusto_compute_fluxes(struct gusto_sim *sim)
 {
   for (int j=0; j<sim->num_faces; ++j) {
 
-    struct mesh_face *face = &sim->faces[j];
-    struct mesh_cell *CL = face->cells[0];
-    struct mesh_cell *CR = face->cells[1];
+    struct mesh_face *F = &sim->faces[j];
+    struct mesh_cell *CL = F->cells[0];
+    struct mesh_cell *CR = F->cells[1];
 
-    double vpar = 0.0 * face->nhat[1] + 0.0 * face->nhat[3];
+    double *v0 = F->verts[0]->v;
+    double *v1 = F->verts[1]->v;
+    double vpar = 0.5 * (VEC4_DOT(v0, F->nhat) + VEC4_DOT(v1, F->nhat));
 
     if (CL && CR) {
-      gusto_riemann(CL->aux, CR->aux, face->nhat, face->Fhat, vpar);
+      gusto_riemann(CL->aux, CR->aux, F->nhat, F->Fhat, vpar);
     }
     else if (CL) {
-      gusto_riemann(CL->aux, CL->aux, face->nhat, face->Fhat, vpar);
+      gusto_riemann(CL->aux, CL->aux, F->nhat, F->Fhat, vpar);
     }
     else if (CR) {
-      gusto_riemann(CR->aux, CR->aux, face->nhat, face->Fhat, vpar);
+      gusto_riemann(CR->aux, CR->aux, F->nhat, F->Fhat, vpar);
     }
   }
 }
@@ -577,13 +621,27 @@ void gusto_compute_fluxes(struct gusto_sim *sim)
 void gusto_transmit_fluxes(struct gusto_sim *sim, double dt)
 {
   for (int j=0; j<sim->num_faces; ++j) {
-    struct mesh_face *face = &sim->faces[j];
-    struct mesh_cell *CL = face->cells[0];
-    struct mesh_cell *CR = face->cells[1];
+    struct mesh_face *F = &sim->faces[j];
+    struct mesh_cell *CL = F->cells[0];
+    struct mesh_cell *CR = F->cells[1];
     for (int q=0; q<8; ++q) {
-      if (CL) CL->U[q] -= face->Fhat[q] * face->nhat[0] * dt;
-      if (CR) CR->U[q] += face->Fhat[q] * face->nhat[0] * dt;
+      if (CL) CL->U[q] -= F->Fhat[q] * F->nhat[0] * dt;
+      if (CR) CR->U[q] += F->Fhat[q] * F->nhat[0] * dt;
     }    
+  }
+}
+
+
+
+void gusto_move_vertices(struct gusto_sim *sim, double dt)
+{
+  for (int n=0; n<sim->num_rows; ++n) {
+    for (int i=0; i<sim->row_size[n]; ++i) {
+      struct mesh_vert *V = &sim->verts[n][i];
+      V->x[1] += dt * V->v[1];
+      V->x[2] += dt * V->v[2];
+      V->x[3] += dt * V->v[3];
+    }
   }
 }
 
@@ -594,6 +652,39 @@ void gusto_recover_variables(struct gusto_sim *sim)
   for (int j=0; j<sim->num_cells; ++j) {
     struct mesh_cell *C = &sim->cells[j];
     gusto_vars_from_conserved(C->aux, C->U, C->dA);
+  }
+}
+
+
+
+void gusto_compute_vertex_velocities(struct gusto_sim *sim)
+{
+  for (int n=0; n<sim->num_rows; ++n) {
+    for (int i=0; i<sim->row_size[n]; ++i) {
+      double *u = sim->verts[n][i].aux[0].velocity_four_vector;
+      sim->verts[n][i].v[1] = u[1] / u[0];
+      sim->verts[n][i].v[2] = u[2] / u[0];
+      sim->verts[n][i].v[3] = u[3] / u[0];
+    }
+  }
+}
+
+
+
+void gusto_enforce_boundary_condition(struct gusto_sim *sim)
+{
+  for (int n=0; n<sim->num_rows-1; ++n) {
+
+    struct mesh_cell *Cinner_bc = sim->verts[n][0].cell;
+    struct mesh_cell *Cinner_in = sim->verts[n][1].cell;
+    struct mesh_cell *Couter_in = sim->verts[n][sim->row_size[n]-3].cell;
+    struct mesh_cell *Couter_bc = sim->verts[n][sim->row_size[n]-2].cell;
+
+    Cinner_bc->aux[0] = Couter_in->aux[0];
+    Couter_bc->aux[0] = Cinner_in->aux[0];
+
+    gusto_vars_to_conserved(&Cinner_bc->aux[0], Cinner_bc->U, Cinner_bc->dA);
+    gusto_vars_to_conserved(&Couter_bc->aux[0], Couter_bc->U, Couter_bc->dA);
   }
 }
 
@@ -673,7 +764,7 @@ int main(int argc, char **argv)
   gusto_user_set_defaults(&sim.user);
   gusto_status_set_defaults(&sim.status);
 
-  
+
   for (int n=1; n<argc; ++n) {
     gusto_user_set_from_arg(&sim.user, argv[n]);
   }
@@ -683,6 +774,7 @@ int main(int argc, char **argv)
   gusto_generate_verts(&sim);
   gusto_generate_cells(&sim);
   gusto_generate_faces(&sim);
+  gusto_compute_mesh_geometry(&sim);
   gusto_initial_data(&sim);
 
 
@@ -693,9 +785,14 @@ int main(int argc, char **argv)
 
     void *start_cycle = gusto_start_clock();
 
+    gusto_compute_variables_at_vertices(&sim);
+    gusto_compute_vertex_velocities(&sim);
     gusto_compute_fluxes(&sim);
     gusto_transmit_fluxes(&sim, dt);
+    gusto_move_vertices(&sim, dt);
+    gusto_compute_mesh_geometry(&sim);
     gusto_recover_variables(&sim);
+    gusto_enforce_boundary_condition(&sim);
 
     double seconds = gusto_stop_clock(start_cycle);
 
@@ -708,7 +805,7 @@ int main(int argc, char **argv)
 	     sim.status.time_step,
 	     sim.status.kzps);
     }
-    
+
     sim.status.time_simulation += dt;
     sim.status.iteration += 1;
   }
