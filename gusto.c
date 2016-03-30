@@ -23,6 +23,10 @@ int main(int argc, char **argv)
 
   gusto_user_report(&sim.user);
   gusto_mesh_generate_verts(&sim);
+  gusto_mesh_generate_cells(&sim);
+  gusto_mesh_compute_geometry(&sim);
+  gusto_write_checkpoint(&sim, NULL);
+
   gusto_mesh_clear(&sim);
 
   return 0;

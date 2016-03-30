@@ -28,7 +28,7 @@ int gusto_mesh_count(struct gusto_sim *sim, char which, int n)
   struct mesh_cell *C;
   int count = 0;
 
-  if (which != 'r' && n == -1) {
+  if (n == -1) {
     for (int m=0; m<sim->num_rows; ++m) {
       count += gusto_mesh_count(sim, which, m);
     }
@@ -42,14 +42,12 @@ int gusto_mesh_count(struct gusto_sim *sim, char which, int n)
     case 'c':
       DL_COUNT(sim->rows[n].cells, C, count);
       break;
-    case 'r':
-      count = sim->num_rows;
-      break;
     }
   }
 
   return count;
 }
+
 
 
 void gusto_mesh_clear(struct gusto_sim *sim)
@@ -80,7 +78,7 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
   sim->rows = (struct mesh_row *) malloc(sim->num_rows*sizeof(struct mesh_row));
 
   int row_size = sim->user.N[1];
-  int ngR = 1; /* number of ghost cells in the R direction */
+  int ngR = 0; /* number of ghost cells in the R direction */
   int ngz = 1; /* number of ghost cells in the z direction */
   double R0 = 0.0;
   double R1 = 1.0;
@@ -117,7 +115,7 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
     /* ----------------------------------------------------------------------
      * Add the vertices, two for each i index (z coordinate).
      * ---------------------------------------------------------------------- */
-    for (int i=0; i<row_size+1; ++i) {
+    for (int i=0; i<row_size+ngz+1; ++i) {
 
       int num_interior_R = sim->num_rows - 2 * ngR;
       int num_interior_z = row_size      - 2 * ngz;
@@ -151,12 +149,6 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
     VL = sim->rows[n].verts;
     VR = sim->rows[n].verts->next;
   }
-
-  printf("num_rows: %d\n", gusto_mesh_count(sim, 'r', -1));
-  printf("num_cells[tot]: %d\n", gusto_mesh_count(sim, 'c', -1));
-  printf("num_cells[row]: %d\n", gusto_mesh_count(sim, 'c', 0));
-  printf("num_verts[tot]: %d\n", gusto_mesh_count(sim, 'v', -1));
-  printf("num_verts[row]: %d\n", gusto_mesh_count(sim, 'v', 0));
 }
 
 
@@ -169,8 +161,13 @@ void gusto_mesh_generate_cells(struct gusto_sim *sim)
    * Add the cells, one for each i index (z coordinate) except the last.
    * ---------------------------------------------------------------------- */
   for (int n=0; n<sim->num_rows; ++n) {
-    int row_size = gusto_mesh_count(sim, 'v', n) / 2;
-    for (int i=0; i<row_size; ++i) {
+
+    int num_cells = gusto_mesh_count(sim, 'v', n) / 2 - 1;
+
+    VL = sim->rows[n].verts;
+    VR = sim->rows[n].verts->next;
+
+    for (int i=0; i<num_cells; ++i) {
       C = (struct mesh_cell *) malloc(sizeof(struct mesh_cell));
       C->verts[0] = VL; VL = VL->next->next;
       C->verts[1] = VL;
@@ -192,55 +189,59 @@ void gusto_mesh_generate_faces(struct gusto_sim *sim)
 
 void gusto_mesh_compute_geometry(struct gusto_sim *sim)
 {
-  struct mesh_cell *C;
+  struct mesh_cell *C = NULL;
+  sim->smallest_cell_length = 1.0;
 
-  DL_FOREACH(sim->cells, C) {
+  for (int n=0; n<sim->num_rows; ++n) {
 
-    /*
-     * These vectors define the 2-forms on the cell. There are four, one for
-     * each corner.
-     */
-    double dR0[4] = VEC4_SUB(C->verts[2]->x, C->verts[0]->x);
-    double dR1[4] = VEC4_SUB(C->verts[3]->x, C->verts[1]->x);
-    double dz0[4] = VEC4_SUB(C->verts[1]->x, C->verts[0]->x);
-    double dz1[4] = VEC4_SUB(C->verts[3]->x, C->verts[2]->x);
-    double dphi[4] = {0, 0, 1, 0};
-    double dAf0[4] = VEC4_CROSS(dz0, dR0);
-    double dAf1[4] = VEC4_CROSS(dz0, dR1);
-    double dAf2[4] = VEC4_CROSS(dz1, dR0);
-    double dAf3[4] = VEC4_CROSS(dz1, dR1);
-    double dAR0[4] = VEC4_CROSS(dphi, dz0);
-    double dAR1[4] = VEC4_CROSS(dphi, dz1);
-    double dAz0[4] = VEC4_CROSS(dR0, dphi);
-    double dAz1[4] = VEC4_CROSS(dR1, dphi);
+    DL_FOREACH(sim->rows[n].cells, C) {
 
-    /* Cell's centroid position */
-    C->x[1] = 0.25 * (C->verts[0]->x[0] + C->verts[1]->x[0] +
-		      C->verts[2]->x[0] + C->verts[3]->x[0]);
-    C->x[2] = 0.25 * (C->verts[0]->x[1] + C->verts[1]->x[1] +
-		      C->verts[2]->x[1] + C->verts[3]->x[1]);
-    C->x[3] = 0.25 * (C->verts[0]->x[2] + C->verts[1]->x[2] +
-		      C->verts[2]->x[2] + C->verts[3]->x[2]);
+      /*
+       * These vectors define the 2-forms on the cell. There are four, one for
+       * each corner.
+       */
+      double dR0[4] = VEC4_SUB(C->verts[2]->x, C->verts[0]->x);
+      double dR1[4] = VEC4_SUB(C->verts[3]->x, C->verts[1]->x);
+      double dz0[4] = VEC4_SUB(C->verts[1]->x, C->verts[0]->x);
+      double dz1[4] = VEC4_SUB(C->verts[3]->x, C->verts[2]->x);
+      double dphi[4] = {0, 0, 1, 0};
+      double dAf0[4] = VEC4_CROSS(dz0, dR0);
+      double dAf1[4] = VEC4_CROSS(dz0, dR1);
+      double dAf2[4] = VEC4_CROSS(dz1, dR0);
+      double dAf3[4] = VEC4_CROSS(dz1, dR1);
+      double dAR0[4] = VEC4_CROSS(dphi, dz0);
+      double dAR1[4] = VEC4_CROSS(dphi, dz1);
+      double dAz0[4] = VEC4_CROSS(dR0, dphi);
+      double dAz1[4] = VEC4_CROSS(dR1, dphi);
 
-    /* Cell's area and volume forms */
-    C->dA[1] = 0.50 * (VEC4_MOD(dAR0) + VEC4_MOD(dAR1));
-    C->dA[2] = 0.25 * (VEC4_MOD(dAf0) + VEC4_MOD(dAf1) +
-		       VEC4_MOD(dAf2) + VEC4_MOD(dAf3));
-    C->dA[3] = 0.50 * (VEC4_MOD(dAz0) + VEC4_MOD(dAz1));
-    C->dA[0] = C->dA[2]; /* Volume and phi cross section are the same */
+      /* Cell's centroid position */
+      C->x[1] = 0.25 * (C->verts[0]->x[0] + C->verts[1]->x[0] +
+			C->verts[2]->x[0] + C->verts[3]->x[0]);
+      C->x[2] = 0.25 * (C->verts[0]->x[1] + C->verts[1]->x[1] +
+			C->verts[2]->x[1] + C->verts[3]->x[1]);
+      C->x[3] = 0.25 * (C->verts[0]->x[2] + C->verts[1]->x[2] +
+			C->verts[2]->x[2] + C->verts[3]->x[2]);
 
-    /* Cell's longitudinal axis */
-    C->zhat[0] = 0.0;
-    C->zhat[1] = 0.5 * (dAz0[1] + dAz1[1]);
-    C->zhat[2] = 0.5 * (dAz0[2] + dAz1[2]);
-    C->zhat[3] = 0.5 * (dAz0[3] + dAz1[3]);
+      /* Cell's area and volume forms */
+      C->dA[1] = 0.50 * (VEC4_MOD(dAR0) + VEC4_MOD(dAR1));
+      C->dA[2] = 0.25 * (VEC4_MOD(dAf0) + VEC4_MOD(dAf1) +
+			 VEC4_MOD(dAf2) + VEC4_MOD(dAf3));
+      C->dA[3] = 0.50 * (VEC4_MOD(dAz0) + VEC4_MOD(dAz1));
+      C->dA[0] = C->dA[2]; /* Volume and phi cross section are the same */
 
-    VEC4_NORMALIZE(C->zhat);
+      /* Cell's longitudinal axis */
+      C->zhat[0] = 0.0;
+      C->zhat[1] = 0.5 * (dAz0[1] + dAz1[1]);
+      C->zhat[2] = 0.5 * (dAz0[2] + dAz1[2]);
+      C->zhat[3] = 0.5 * (dAz0[3] + dAz1[3]);
 
-    double dAR = gusto_min3(VEC4_MOD(dAR0), VEC4_MOD(dAR1), 1.0);
-    double dAz = gusto_min3(VEC4_MOD(dAz0), VEC4_MOD(dAz1), 1.0);
+      VEC4_NORMALIZE(C->zhat);
 
-    if (dAR < sim->smallest_cell_length) sim->smallest_cell_length = dAR;
-    if (dAz < sim->smallest_cell_length) sim->smallest_cell_length = dAz;
+      double dAR = gusto_min3(VEC4_MOD(dAR0), VEC4_MOD(dAR1), 1.0);
+      double dAz = gusto_min3(VEC4_MOD(dAz0), VEC4_MOD(dAz1), 1.0);
+
+      if (dAR < sim->smallest_cell_length) sim->smallest_cell_length = dAR;
+      if (dAz < sim->smallest_cell_length) sim->smallest_cell_length = dAz;
+    }
   }
 }

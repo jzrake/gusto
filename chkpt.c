@@ -10,7 +10,7 @@
       data[i] = V->member;						\
       V = V->next;							\
     }									\
-    hid_t set = H5Dcreate(row, alias, H5T_NATIVE_DOUBLE, spc,		\
+    hid_t set = H5Dcreate(vg, alias, H5T_NATIVE_DOUBLE, spc,		\
 			  H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);	\
     H5Dwrite(set, H5T_NATIVE_DOUBLE, spc, spc, H5P_DEFAULT, data);	\
     H5Dclose(set);							\
@@ -24,12 +24,11 @@
       data[i] = C->member;						\
       C = C->next;							\
     }									\
-    hid_t set = H5Dcreate(row, alias, H5T_NATIVE_DOUBLE, spc,		\
+    hid_t set = H5Dcreate(cg, alias, H5T_NATIVE_DOUBLE, spc,		\
 			  H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);	\
     H5Dwrite(set, H5T_NATIVE_DOUBLE, spc, spc, H5P_DEFAULT, data);	\
     H5Dclose(set);							\
   } while(0)								\
-
 
 
 
@@ -51,6 +50,8 @@ void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname)
 
     snprintf(row_name, 64, "row_%06d", n);
     hid_t row = H5Gcreate(grp, row_name, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    hid_t vg = H5Gcreate(row, "verts", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    hid_t cg = H5Gcreate(row, "cells", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 
     /*
      * Write the vertex data
@@ -64,7 +65,6 @@ void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname)
       WRITE_VARIABLE_VERT(x[1], "x1");
       WRITE_VARIABLE_VERT(x[2], "x2");
       WRITE_VARIABLE_VERT(x[3], "x3");
-
       free(data);
       H5Sclose(spc);
     }
@@ -81,19 +81,22 @@ void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname)
       WRITE_VARIABLE_CELL(x[1], "x1");
       WRITE_VARIABLE_CELL(x[2], "x2");
       WRITE_VARIABLE_CELL(x[3], "x3");
-      WRITE_VARIABLE_CELL(aux[0].velocity_four_vector[1], "u1");
-      WRITE_VARIABLE_CELL(aux[0].velocity_four_vector[2], "u2");
-      WRITE_VARIABLE_CELL(aux[0].velocity_four_vector[3], "u3");
-      WRITE_VARIABLE_CELL(aux[0].magnetic_four_vector[1], "b1");
-      WRITE_VARIABLE_CELL(aux[0].magnetic_four_vector[2], "b2");
-      WRITE_VARIABLE_CELL(aux[0].magnetic_four_vector[3], "b3");
-      WRITE_VARIABLE_CELL(aux[0].comoving_mass_density, "dg");
-      WRITE_VARIABLE_CELL(aux[0].gas_pressure, "pg");
+
+      /* WRITE_VARIABLE_CELL(aux[0].velocity_four_vector[1], "u1"); */
+      /* WRITE_VARIABLE_CELL(aux[0].velocity_four_vector[2], "u2"); */
+      /* WRITE_VARIABLE_CELL(aux[0].velocity_four_vector[3], "u3"); */
+      /* WRITE_VARIABLE_CELL(aux[0].magnetic_four_vector[1], "b1"); */
+      /* WRITE_VARIABLE_CELL(aux[0].magnetic_four_vector[2], "b2"); */
+      /* WRITE_VARIABLE_CELL(aux[0].magnetic_four_vector[3], "b3"); */
+      /* WRITE_VARIABLE_CELL(aux[0].comoving_mass_density, "dg"); */
+      /* WRITE_VARIABLE_CELL(aux[0].gas_pressure, "pg"); */
 
       free(data);
       H5Sclose(spc);
     }
 
+    H5Gclose(vg);
+    H5Gclose(cg);
     H5Gclose(row);
   }
 
