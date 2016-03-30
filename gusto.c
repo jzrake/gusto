@@ -4,6 +4,7 @@
 #include "gusto.h"
 #include "srmhd_c2p.h"
 #include "quartic.h"
+#include "utlist.h"
 
 
 #define VEC4_SUB(x,y) {0,x[1]-y[1],x[2]-y[2],x[3]-y[3]}
@@ -202,10 +203,39 @@ int gusto_vars_from_conserved(struct aux_variables *A, double U[8], double dA[4]
     printf("c2p failed: %s\n", srmhd_c2p_get_error(c2p, error));
     printf("%f %f %f %f %f %f %f %f\n", Uin[0], Uin[1], Uin[2], Uin[3], Uin[4], Uin[5], Uin[6], Uin[7]);
   }
-  
+
   return error;
 }
 
+
+int gusto_count(struct gusto_sim *sim, char which, int n)
+{
+  struct mesh_vert *V;
+  struct mesh_cell *C;
+  int count = 0;
+
+  if (which != 'r' && n == -1) {
+    for (int m=0; m<sim->num_rows; ++m) {
+      count += gusto_count(sim, which, m);
+    }
+  }
+
+  else {
+    switch (which) {
+    case 'v':
+      DL_COUNT(sim->rows[n].verts, V, count);
+      break;
+    case 'c':
+      DL_COUNT(sim->rows[n].cells, C, count);
+      break;
+    case 'r':
+      count = sim->num_rows;
+      break;
+    }
+  }
+
+  return count;
+}
 
 
 void gusto_generate_verts(struct gusto_sim *sim)
@@ -246,10 +276,114 @@ void gusto_generate_verts(struct gusto_sim *sim)
       V.v[3] = 0.0;
 
       V.cell = NULL;
-      
+
       sim->verts[n][i] = V;
     }
   }
+
+
+
+  /* remember that num_rows was previously number of 2D surfaces, now
+     volumes. Also, row_size is now the number of cells, not vertices. */
+  sim->rows = (struct mesh_row *) malloc(sim->num_rows*sizeof(struct mesh_row));
+
+
+  int ngR = 1; /* number of ghost cells in the R direction */
+  int ngz = 1; /* number of ghost cells in the z direction */
+  double R0 = 0.0;
+  double R1 = 1.0;
+  double z0 = 0.0;
+  double z1 = 1.0;
+
+
+  for (int n=0; n<sim->num_rows; ++n) {
+
+    /* Iteration variables for going over the linked list: */
+    struct mesh_vert *VL, *VR;
+    struct mesh_cell *C;
+
+    /*
+     * Initiate the lists by setting them to NULL. Each row is lined with
+     * vertices to its left and right. The list of vertices for a given row
+     * alternates from left to right, so for a vertex VL on the left of the row,
+     * its neighbor at the same (or similar) z coordinate is VR = VL->next. The
+     * verts data member for a given cell is arranged like so:
+     *
+     *  1-------3
+     *  |       |
+     *  |       |
+     *  0-------2
+     *
+     *  z
+     *  ^
+     *  |
+     *  |
+     *  x----> R
+     *
+     */
+    sim->rows[n].verts = NULL;
+    sim->rows[n].cells = NULL;
+
+    /* ----------------------------------------------------------------------
+     * Add the vertices, two for each i index (z coordinate).
+     * ---------------------------------------------------------------------- */
+    for (int i=0; i<sim->row_size[n]+1; ++i) {
+
+      int num_interior_R = sim->num_rows    - 2 * ngR;
+      int num_interior_z = sim->row_size[n] - 2 * ngz;
+      int n_real = n - ngR;
+      int i_real = i - ngz;
+      double dR = (R1 - R0) / num_interior_R;
+      double dz = (z1 - z0) / num_interior_z;
+
+      VL = (struct mesh_vert *) malloc(sizeof(struct mesh_vert));
+      VR = (struct mesh_vert *) malloc(sizeof(struct mesh_vert));
+
+
+      VL->x[0] = 0.0;
+      VR->x[0] = 0.0;
+
+      VL->x[1] = R0 + (n_real + 0) * dR;
+      VR->x[1] = R0 + (n_real + 1) * dR;
+      VL->x[2] = 0.0;
+      VR->x[2] = 0.0;
+      VL->x[3] = z0 + i_real * dz;
+      VR->x[3] = z0 + i_real * dz;
+
+      for (int d=0; d<4; ++d) { /* vertex velocities */
+	VL->v[d] = 0.0;
+	VR->v[d] = 0.0;
+      }
+
+      DL_APPEND(sim->rows[n].verts, VL);
+      DL_APPEND(sim->rows[n].verts, VR);
+    }
+
+    VL = sim->rows[n].verts;
+    VR = sim->rows[n].verts->next;
+
+    /* ----------------------------------------------------------------------
+     * Add the cells, one for each i index (z coordinate) except the last.
+     * ---------------------------------------------------------------------- */
+    for (int i=0; i<sim->row_size[n]; ++i) {
+      C = (struct mesh_cell *) malloc(sizeof(struct mesh_cell));
+      C->verts[0] = VL; VL = VL->next->next;
+      C->verts[1] = VL;
+      C->verts[2] = VR; VR = VR->next->next;
+      C->verts[3] = VR;
+      DL_APPEND(sim->rows[n].cells, C);
+    }
+  }
+
+  printf("num_rows: %d\n", gusto_count(sim, 'r', -1));
+  printf("num_cells[tot]: %d\n", gusto_count(sim, 'c', -1));
+  printf("num_cells[row]: %d\n", gusto_count(sim, 'c', 0));
+  printf("num_verts[tot]: %d\n", gusto_count(sim, 'v', -1));
+  printf("num_verts[row]: %d\n", gusto_count(sim, 'v', 0));
+  printf("------------------------------------------------\n");
+
+  //printf("num_cells: %d\n", sim->num_cells);
+  //printf("num_cells_max: %d\n", sim->num_cells_max);
 }
 
 
@@ -282,7 +416,7 @@ void gusto_generate_cells(struct gusto_sim *sim)
       j += 1;
     }
   }
- 
+
   printf("num_cells: %d\n", sim->num_cells);
   printf("num_cells_max: %d\n", sim->num_cells_max);
 }
@@ -322,7 +456,7 @@ void gusto_generate_faces(struct gusto_sim *sim)
 		   sim->faces, sim->num_faces, sim->num_faces_max, F);
     }
   }
-  
+
   printf("num_faces: %d\n", sim->num_faces);
   printf("num_faces_max: %d\n", sim->num_faces_max);
 }
@@ -410,7 +544,7 @@ void gusto_initial_data(struct gusto_sim *sim)
     double *X0 = sim->cells[j].verts[0]->x;
     double *X1 = sim->cells[j].verts[1]->x;
     double *X2 = sim->cells[j].verts[2]->x;
-    double *X3 = sim->cells[j].verts[3]->x;   
+    double *X3 = sim->cells[j].verts[3]->x;
     double R = 0.25 * (X0[1] + X1[1] + X2[1] + X3[1]);
     double z = 0.25 * (X0[3] + X1[3] + X2[3] + X3[3]);
     double X[4] = {0, R, 0, z};
@@ -605,7 +739,7 @@ void gusto_transmit_fluxes(struct gusto_sim *sim, double dt)
     for (int q=0; q<8; ++q) {
       if (CL) CL->U[q] -= F->Fhat[q] * F->nhat[0] * dt;
       if (CR) CR->U[q] += F->Fhat[q] * F->nhat[0] * dt;
-    }    
+    }
   }
 }
 
@@ -681,7 +815,7 @@ void gusto_compute_variables_at_vertices(struct gusto_sim *sim)
       sim->verts[n][i].num = 0;
     }
   }
-  
+
   for (int j=0; j<sim->num_cells; ++j) {
     struct mesh_cell *C = &sim->cells[j];
     for (int v=0; v<4; ++v) {
@@ -713,10 +847,37 @@ void gusto_compute_variables_at_vertices(struct gusto_sim *sim)
 
 
 /*
+ * For refactoring
+ * =====================================================================
+ */
+int main_refactor(int argc, char **argv)
+{
+  struct gusto_sim sim;
+  gusto_user_set_defaults(&sim.user);
+  gusto_status_set_defaults(&sim.status);
+
+
+  for (int n=1; n<argc; ++n) {
+    gusto_user_set_from_arg(&sim.user, argv[n]);
+  }
+
+
+  gusto_user_report(&sim.user);
+  gusto_generate_verts(&sim);
+  /* gusto_generate_cells(&sim); */
+  /* gusto_generate_faces(&sim); */
+  /* gusto_compute_mesh_geometry(&sim); */
+  /* gusto_initial_data(&sim); */
+
+  return 0;
+}
+
+
+/*
  * Main function
  * =====================================================================
  */
-int main(int argc, char **argv)
+int main_run(int argc, char **argv)
 {
   struct gusto_sim sim;
   gusto_user_set_defaults(&sim.user);
@@ -783,4 +944,11 @@ int main(int argc, char **argv)
 
   gusto_free(&sim);
   return 0;
+}
+
+
+
+int main(int argc, char **argv)
+{
+  return main_refactor(argc, argv);
 }

@@ -28,6 +28,8 @@ struct mesh_vert
   struct aux_variables aux[4];
   struct mesh_cell *cell;
   int num; /* temporary solution for averaging cells to verts */
+  struct mesh_vert *next;
+  struct mesh_vert *prev;
 } ;
 
 
@@ -42,11 +44,20 @@ struct mesh_face
 
 struct mesh_cell
 {
-  struct mesh_vert *verts[4];
   double dA[4];                /* 0: volume, dA1, dA2, dA3: cross-sections */
   double zhat[4];              /* 1,2,3: cell's longitudinal axis (unit) */
   double U[8];                 /* total mass, energy, momentum, magnetic flux */
+  struct mesh_vert *verts[4];
   struct aux_variables aux[5]; /* aux vars at different cell locations */
+  struct mesh_cell *next;
+  struct mesh_cell *prev;
+} ;
+
+
+struct mesh_row
+{
+  struct mesh_vert *verts;
+  struct mesh_cell *cells;
 } ;
 
 
@@ -68,6 +79,7 @@ struct gusto_sim
   struct mesh_vert **verts;
   struct mesh_face *faces;
   struct mesh_cell *cells;
+  struct mesh_row *rows;
 } ;
 
 
