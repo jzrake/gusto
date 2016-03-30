@@ -71,8 +71,11 @@ struct gusto_sim
 } ;
 
 
+
 void gusto_init(struct gusto_sim *sim);
 void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname);
+void *gusto_start_clock();
+double gusto_stop_clock(void *clock_s);
 
 
 
