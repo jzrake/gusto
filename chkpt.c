@@ -15,17 +15,25 @@
 
 
 void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname)
-{  
-  char rowname[64];
+{
+  char default_name[64];
+  char row_name[64];
+
+  if (fname == NULL) {
+    snprintf(default_name, 64, "chkpt.%04d.h5", sim->status.checkpoint_number);
+    fname = default_name;
+  }
+  printf("[gusto] writing checkpoint %s\n", fname);
+
   hid_t h5f = H5Fcreate(fname, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
   hid_t grp = H5Gcreate(h5f, "rows", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 
   for (int n=0; n<sim->num_rows; ++n) {
-    snprintf(rowname, 64, "row_%06d", n);
+    snprintf(row_name, 64, "row_%06d", n);
     double *data = (double *) malloc(sim->row_size[n] * sizeof(double));    
     hsize_t row_size = sim->row_size[n];
     hid_t spc = H5Screate_simple(1, &row_size, NULL);
-    hid_t row = H5Gcreate(grp, rowname, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    hid_t row = H5Gcreate(grp, row_name, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 
     WRITE_VARIABLE(x[1], "x1");
     WRITE_VARIABLE(x[2], "x2");
@@ -46,4 +54,7 @@ void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname)
   
   H5Gclose(grp);
   H5Fclose(h5f);
+
+  gusto_read_write_status(&sim->status, fname, 'a');
+  gusto_read_write_user(&sim->user, fname, 'a');
 }

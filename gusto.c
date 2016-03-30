@@ -700,6 +700,7 @@ void gusto_compute_variables_at_vertices(struct gusto_sim *sim)
       }
       sim->verts[n][i].aux[0].comoving_mass_density = 0.0;
       sim->verts[n][i].aux[0].gas_pressure = 0.0;
+      sim->verts[n][i].num = 0;
     }
   }
   
@@ -707,6 +708,7 @@ void gusto_compute_variables_at_vertices(struct gusto_sim *sim)
     struct mesh_cell *C = &sim->cells[j];
     for (int v=0; v<4; ++v) {
       struct aux_variables *A = &C->verts[v]->aux[0];
+      C->verts[v]->num += 1;
       for (int d=1; d<4; ++d) {
 	A->velocity_four_vector[d] += C->aux[0].velocity_four_vector[d];
 	A->magnetic_four_vector[d] += C->aux[0].magnetic_four_vector[d];
@@ -718,38 +720,16 @@ void gusto_compute_variables_at_vertices(struct gusto_sim *sim)
 
   for (int n=0; n<sim->num_rows; ++n) {
     for (int i=0; i<sim->row_size[n]; ++i) {
+      int N = sim->verts[n][i].num;
       for (int d=1; d<4; ++d) {
-	sim->verts[n][i].aux[0].velocity_four_vector[d] /= 4;
-	sim->verts[n][i].aux[0].magnetic_four_vector[d] /= 4;
+	sim->verts[n][i].aux[0].velocity_four_vector[d] /= N;
+	sim->verts[n][i].aux[0].magnetic_four_vector[d] /= N;
       }
-      sim->verts[n][i].aux[0].comoving_mass_density /= 4;
-      sim->verts[n][i].aux[0].gas_pressure /= 4;
+      sim->verts[n][i].aux[0].comoving_mass_density /= N;
+      sim->verts[n][i].aux[0].gas_pressure /= N;
       gusto_vars_complete_aux(&sim->verts[n][i].aux[0]);
     }
   }
-}
-
-
-
-void gusto_write_to_ascii(struct gusto_sim *sim)
-{
-  FILE *outf = fopen("gusto.dat", "w");
-  for (int j=0; j<sim->num_cells; ++j) {
-    struct mesh_cell *C = &sim->cells[j];
-    double *u = C->aux[0].velocity_four_vector;
-    double *b = C->aux[0].magnetic_four_vector;
-    double z = 0.25 * (C->verts[0]->x[3] + C->verts[1]->x[3] +
-		       C->verts[2]->x[3] + C->verts[3]->x[3]);
-    fprintf(outf, "%f "
-	    "%f %f %f %f "
-	    "%f %f %f %f "
-	    "%f %f\n", z,
-	    u[0], u[1], u[2], u[3],
-	    b[0], b[1], b[2], b[3],
-	    C->aux[0].comoving_mass_density,
-	    C->aux[0].gas_pressure);
-  }
-  fclose(outf);
 }
 
 
@@ -783,6 +763,19 @@ int main(int argc, char **argv)
 
   while (sim.status.time_simulation < sim.user.tmax) {
 
+    /*
+     * Write a checkpoint if it's time
+     * =================================================================
+     */
+    if (sim.status.time_simulation - sim.status.time_last_checkpoint >=
+	sim.user.cpi && sim.user.cpi > 0.0) {
+
+      sim.status.time_last_checkpoint += sim.user.cpi;
+      sim.status.checkpoint_number += 1;
+
+      gusto_write_checkpoint(&sim, NULL);
+    }
+
     void *start_cycle = gusto_start_clock();
 
     gusto_compute_variables_at_vertices(&sim);
@@ -799,7 +792,7 @@ int main(int argc, char **argv)
     sim.status.kzps = 1e-3 * sim.num_cells / seconds;
 
     if (sim.status.iteration % 1 == 0) {
-      printf("[ffe] n=%06d t=%6.4e dt=%6.4e %3.2f kzps\n",
+      printf("[gusto] n=%06d t=%6.4e dt=%6.4e %3.2f kzps\n",
 	     sim.status.iteration,
 	     sim.status.time_simulation,
 	     sim.status.time_step,
@@ -809,12 +802,6 @@ int main(int argc, char **argv)
     sim.status.time_simulation += dt;
     sim.status.iteration += 1;
   }
-
-  gusto_compute_variables_at_vertices(&sim);
-  gusto_write_to_ascii(&sim);
-  gusto_write_checkpoint(&sim, "chkpt.0000.h5");
-  gusto_read_write_status(&sim.status, "chkpt.0000.h5", 'a');
-  gusto_read_write_user(&sim.user, "chkpt.0000.h5", 'a');
 
   gusto_free(&sim);
   return 0;

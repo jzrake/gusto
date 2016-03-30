@@ -27,6 +27,7 @@ struct mesh_vert
   double v[4];
   struct aux_variables aux[4];
   struct mesh_cell *cell;
+  int num; /* temporary solution for averaging cells to verts */
 } ;
 
 
