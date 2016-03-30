@@ -54,6 +54,7 @@ void gusto_mesh_clear(struct gusto_sim *sim)
 {
   struct mesh_vert *V0, *V1;
   struct mesh_cell *C0, *C1;
+  struct mesh_face *F0, *F1;
 
   for (int n=0; n<sim->num_rows; ++n) {
     DL_FOREACH_SAFE(sim->rows[n].verts, V0, V1) {
@@ -64,6 +65,11 @@ void gusto_mesh_clear(struct gusto_sim *sim)
       DL_DELETE(sim->rows[n].cells, C0);
       free(C0);
     }
+  }
+
+  DL_FOREACH_SAFE(sim->faces, F0, F1) {
+    DL_DELETE(sim->faces, F0);
+    free(F0);
   }
 
   free(sim->rows);
@@ -162,12 +168,10 @@ void gusto_mesh_generate_cells(struct gusto_sim *sim)
    * ---------------------------------------------------------------------- */
   for (int n=0; n<sim->num_rows; ++n) {
 
-    int num_cells = gusto_mesh_count(sim, 'v', n) / 2 - 1;
-
     VL = sim->rows[n].verts;
     VR = sim->rows[n].verts->next;
 
-    for (int i=0; i<num_cells; ++i) {
+    while (VR->next) {
       C = (struct mesh_cell *) malloc(sizeof(struct mesh_cell));
       C->verts[0] = VL; VL = VL->next->next;
       C->verts[1] = VL;
@@ -182,7 +186,33 @@ void gusto_mesh_generate_cells(struct gusto_sim *sim)
 
 void gusto_mesh_generate_faces(struct gusto_sim *sim)
 {
+  struct mesh_vert *VL, *VR;
+  struct mesh_cell *CR;
+  struct mesh_face *F;
 
+  sim->faces = NULL;
+
+  for (int n=0; n<sim->num_rows; ++n) {
+
+    VL = sim->rows[n].verts;
+    VR = sim->rows[n].verts->next;
+    CR = sim->rows[n].cells;
+
+    while (VR->next) {
+
+      F = (struct mesh_face *) malloc(sizeof(struct mesh_face));
+      F->verts[0] = VL;
+      F->verts[1] = VR;
+      F->cells[0] = CR->prev;
+      F->cells[1] = CR;
+
+      DL_APPEND(sim->faces, F);
+
+      VL = VL->next->next;
+      VR = VR->next->next;
+      CR = CR->next;
+    }
+  }
 }
 
 

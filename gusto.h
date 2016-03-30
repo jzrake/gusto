@@ -42,6 +42,8 @@ struct mesh_face
   double nhat[4]; /* 0: face area, 1,2,3: unit normal */
   struct mesh_vert *verts[2];
   struct mesh_cell *cells[2];
+  struct mesh_face *next;
+  struct mesh_face *prev;
 } ;
 
 struct mesh_cell
