@@ -49,7 +49,7 @@ void initial_data_function(struct aux_variables *A, double *X)
   }
   else {
     A->comoving_mass_density = 0.1;
-    A->gas_pressure = 0.125;
+    A->gas_pressure = 1.0;//0.125;
   }
   gusto_vars_complete_aux(A);
 }
@@ -506,7 +506,7 @@ int gusto_fluxes(struct aux_variables *A, double n[4], double F[8])
 void gusto_riemann(struct aux_variables *AL,
 		   struct aux_variables *AR,
 		   double nhat[4],
-		   double Fhat[8])
+		   double Fhat[8], double s)
 {
   double lamL[8];
   double lamR[8];
@@ -533,8 +533,18 @@ void gusto_riemann(struct aux_variables *AL,
     F_hll[q] = (Sp*FL[q] - Sm*FR[q] + Sp*Sm*(UR[q] - UL[q])) / (Sp - Sm);
   }
 
+  double F[8], U[8];
+
+  if      (        s<=Sm) for (int q=0; q<8; ++q) U[q] = UL[q];
+  else if (Sm<s && s<=Sp) for (int q=0; q<8; ++q) U[q] = U_hll[q];
+  else if (Sp<s         ) for (int q=0; q<8; ++q) U[q] = UR[q];
+
+  if      (        s<=Sm) for (int q=0; q<8; ++q) F[q] = FL[q];
+  else if (Sm<s && s<=Sp) for (int q=0; q<8; ++q) F[q] = F_hll[q];
+  else if (Sp<s         ) for (int q=0; q<8; ++q) F[q] = FR[q];
+
   for (int q=0; q<8; ++q) {
-    Fhat[q] = F_hll[q];
+    Fhat[q] = F[q] - s * U[q];
   }
 }
 
@@ -548,14 +558,16 @@ void gusto_compute_fluxes(struct gusto_sim *sim)
     struct mesh_cell *CL = face->cells[0];
     struct mesh_cell *CR = face->cells[1];
 
+    double vpar = 0.0 * face->nhat[1] + 0.0 * face->nhat[3];
+
     if (CL && CR) {
-      gusto_riemann(CL->aux, CR->aux, face->nhat, face->Fhat);
+      gusto_riemann(CL->aux, CR->aux, face->nhat, face->Fhat, vpar);
     }
     else if (CL) {
-      gusto_riemann(CL->aux, CL->aux, face->nhat, face->Fhat);
+      gusto_riemann(CL->aux, CL->aux, face->nhat, face->Fhat, vpar);
     }
     else if (CR) {
-      gusto_riemann(CR->aux, CR->aux, face->nhat, face->Fhat);
+      gusto_riemann(CR->aux, CR->aux, face->nhat, face->Fhat, vpar);
     }
   }
 }
