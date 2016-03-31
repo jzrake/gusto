@@ -1,7 +1,9 @@
 /gusto
 /gusto.dSYM
 /Makefile.in
-/*.o
+
+*.o
+*.pyc
 
 *.h5
 *.dat

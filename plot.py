@@ -2,7 +2,7 @@ import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import h5py
-
+import gusto_dataset
 
 
 
@@ -55,9 +55,22 @@ def plot_h5():
 
 
 
+def plot_faces(filename):
+    dset = gusto_dataset.GustoDataset(filename)
+    segments = dset.get_face_segments()
+
+    for seg in segments:
+        plt.plot(seg[:,0], seg[:,2], '-o', c='k')
+
+    plt.axis('equal')
+    plt.show()
+
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('filenames', nargs='+')
     args = parser.parse_args()
 
-    plot_h5_1d(args.filenames)
+    #plot_h5_1d(args.filenames)
+    plot_faces(args.filenames[0])

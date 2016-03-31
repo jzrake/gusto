@@ -26,6 +26,7 @@ int gusto_mesh_count(struct gusto_sim *sim, char which, int n)
 {
   struct mesh_vert *V;
   struct mesh_cell *C;
+  struct mesh_face *F;
   int count = 0;
 
   if (n == -1) {
@@ -41,6 +42,9 @@ int gusto_mesh_count(struct gusto_sim *sim, char which, int n)
       break;
     case 'c':
       DL_COUNT(sim->rows[n].cells, C, count);
+      break;
+    case 'f':
+      DL_COUNT(sim->faces, F, count);
       break;
     }
   }
@@ -85,7 +89,7 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
 
   int row_size = sim->user.N[1];
   int ngR = 0; /* number of ghost cells in the R direction */
-  int ngz = 1; /* number of ghost cells in the z direction */
+  int ngz = 0; /* number of ghost cells in the z direction */
   double R0 = 0.0;
   double R1 = 1.0;
   double z0 = 0.0;
@@ -133,9 +137,13 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
       VL = (struct mesh_vert *) malloc(sizeof(struct mesh_vert));
       VR = (struct mesh_vert *) malloc(sizeof(struct mesh_vert));
 
+      VL->row_index = n;
+      VR->row_index = n;
+      VL->col_index = 2*i + 0;
+      VR->col_index = 2*i + 1;
+
       VL->x[0] = 0.0;
       VR->x[0] = 0.0;
-
       VL->x[1] = R0 + (n_real + 0) * dR;
       VR->x[1] = R0 + (n_real + 1) * dR;
       VL->x[2] = 0.0;
@@ -151,10 +159,9 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
       DL_APPEND(sim->rows[n].verts, VL);
       DL_APPEND(sim->rows[n].verts, VR);
     }
-
-    VL = sim->rows[n].verts;
-    VR = sim->rows[n].verts->next;
   }
+  printf("[gusto] number rows  ... %d\n", sim->num_rows);
+  printf("[gusto] number verts ... %d\n", gusto_mesh_count(sim, 'v', -1));
 }
 
 
@@ -163,6 +170,7 @@ void gusto_mesh_generate_cells(struct gusto_sim *sim)
 {
   struct mesh_vert *VL, *VR;
   struct mesh_cell *C;
+
   /* ----------------------------------------------------------------------
    * Add the cells, one for each i index (z coordinate) except the last.
    * ---------------------------------------------------------------------- */
@@ -180,6 +188,7 @@ void gusto_mesh_generate_cells(struct gusto_sim *sim)
       DL_APPEND(sim->rows[n].cells, C);
     }
   }
+  printf("[gusto] number cells ... %d\n", gusto_mesh_count(sim, 'c', -1));
 }
 
 
@@ -187,7 +196,7 @@ void gusto_mesh_generate_cells(struct gusto_sim *sim)
 void gusto_mesh_generate_faces(struct gusto_sim *sim)
 {
   struct mesh_vert *VL, *VR;
-  struct mesh_cell *CR;
+  struct mesh_cell *CL, *CR;
   struct mesh_face *F;
 
   sim->faces = NULL;
@@ -196,34 +205,50 @@ void gusto_mesh_generate_faces(struct gusto_sim *sim)
 
     VL = sim->rows[n].verts;
     VR = sim->rows[n].verts->next;
+    CL = NULL;
     CR = sim->rows[n].cells;
 
-    while (VR->next) {
+    /* ----------------------------------------------------------------------
+     * Add the faces, one for each z coordinate (pair of vertices).
+     * ---------------------------------------------------------------------- */
+    while (1) {
 
       F = (struct mesh_face *) malloc(sizeof(struct mesh_face));
       F->verts[0] = VL;
       F->verts[1] = VR;
-      F->cells[0] = CR->prev;
+      F->cells[0] = CL;
       F->cells[1] = CR;
 
       DL_APPEND(sim->faces, F);
 
-      VL = VL->next->next;
-      VR = VR->next->next;
-      CR = CR->next;
+      if (CR) { /* it was not the last row */
+	VL = VL->next->next;
+	VR = VR->next->next;
+	CL = CR;
+	CR = CR->next;
+      }
+      else {
+	break;
+      }
     }
   }
+  printf("[gusto] number faces ... %d\n", gusto_mesh_count(sim, 'f', -1));
 }
 
 
 
 void gusto_mesh_compute_geometry(struct gusto_sim *sim)
 {
-  struct mesh_cell *C = NULL;
+  struct mesh_cell *C;
+  struct mesh_face *F;
+
   sim->smallest_cell_length = 1.0;
 
+  /*
+   * Set the cell geometry
+   * ---------------------------------------------------------------------------
+   */
   for (int n=0; n<sim->num_rows; ++n) {
-
     DL_FOREACH(sim->rows[n].cells, C) {
 
       /*
@@ -273,5 +298,19 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
       if (dAR < sim->smallest_cell_length) sim->smallest_cell_length = dAR;
       if (dAz < sim->smallest_cell_length) sim->smallest_cell_length = dAz;
     }
+  }
+
+  /*
+   * Set the face geometry
+   * ---------------------------------------------------------------------------
+   */
+  DL_FOREACH(sim->faces, F) {
+    double df[4] = {0, 0, 1, 0};
+    double dl[4] = VEC4_SUB(F->verts[1]->x, F->verts[0]->x);
+    double dA[4] = VEC4_CROSS(dl, df);
+    F->nhat[0] = VEC4_MOD(dA);
+    F->nhat[1] = dA[1] / F->nhat[0];
+    F->nhat[2] = dA[2] / F->nhat[0];
+    F->nhat[3] = dA[3] / F->nhat[0];
   }
 }

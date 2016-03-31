@@ -23,8 +23,7 @@ HEADERS = gusto.h
 
 default : $(APP)
 
-
-ser.c : ser.h
+gusto.h : ser.h
 
 %.c : %.jin.c build.py
 	$(JINJA2) > $@
@@ -35,8 +34,8 @@ ser.c : ser.h
 %.o : %.c $(HEADERS)
 	$(CC) $(CFLAGS) $< $(HDF5_I) -c
 
-$(APP) : $(OBJ) $(COW_LIB)
-	$(CC) $(CFLAGS) $^ $(HDF5_L) $(FFTW_L) $(RNPL_L) $(CLIBS) -o $@
+$(APP) : $(OBJ)
+	$(CC) $(CFLAGS) $^ $(HDF5_L) $(CLIBS) -o $@
 
 clean :
 	$(RM) $(APP) $(OBJ)

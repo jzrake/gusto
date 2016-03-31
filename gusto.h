@@ -32,6 +32,8 @@ struct mesh_vert
   struct aux_variables aux[4];
   struct mesh_cell *cell;
   int num; /* temporary solution for averaging cells to verts */
+  int row_index;
+  int col_index;
   struct mesh_vert *next;
   struct mesh_vert *prev;
 } ;

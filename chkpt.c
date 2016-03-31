@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <hdf5.h>
+#include "utlist.h"
 #include "gusto.h"
 
 
@@ -98,6 +99,41 @@ void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname)
     H5Gclose(vg);
     H5Gclose(cg);
     H5Gclose(row);
+  }
+
+  /*
+   * Write the face data
+   * -------------------------------------------------------------------------
+   */
+  if (1) {
+
+    /*
+     * Face data has shape [Nfaces, 2, 2]
+     *
+     *       [face, vert0/vert1, row_index/col_index]
+     * -----------------------------------------------------------------------
+     */
+    hsize_t data_size[3] = { gusto_mesh_count(sim, 'f', 0), 2, 2 };
+    hid_t spc = H5Screate_simple(3, data_size, NULL);
+    int *data = (int *) malloc(data_size[0] * 4 * sizeof(int));
+
+    struct mesh_face *F;
+
+    int data_index = 0;
+
+    DL_FOREACH(sim->faces, F) {
+      data[data_index++] = F->verts[0]->row_index;
+      data[data_index++] = F->verts[0]->col_index;
+      data[data_index++] = F->verts[1]->row_index;
+      data[data_index++] = F->verts[1]->col_index;
+    }
+
+    hid_t set = H5Dcreate(h5f, "faces", H5T_NATIVE_INT, spc,
+			  H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    H5Dwrite(set, H5T_NATIVE_INT, spc, spc, H5P_DEFAULT, data);
+    H5Dclose(set);
+    H5Sclose(spc);
+    free(data);
   }
 
   H5Gclose(grp);
