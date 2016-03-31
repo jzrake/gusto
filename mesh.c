@@ -5,22 +5,6 @@
 #include "gusto.h"
 
 
-#define VEC4_SUB(x,y) {0,x[1]-y[1],x[2]-y[2],x[3]-y[3]}
-#define VEC4_ADD(x,y) {0,x[1]+y[1],x[2]+y[2],x[3]+y[3]}
-#define VEC4_DOT(x,y) (x[1]*y[1]+x[2]*y[2]+x[3]*y[3])
-#define VEC4_MOD(x) sqrt(VEC4_DOT(x,x))
-#define VEC4_CROSS(x,y) {0,			\
-			 x[2]*y[3]-x[3]*y[2],	\
-			 x[3]*y[1]-x[1]*y[3],	\
-			 x[1]*y[2]-x[2]*y[1]}
-#define VEC4_NORMALIZE(x) do {					\
-    double norm = sqrt(x[1]*x[1] + x[2]*x[2] + x[3]*x[3]);	\
-    x[1] /= norm;						\
-    x[2] /= norm;						\
-    x[3] /= norm;						\
-  } while (0)
-
-
 
 void gusto_mesh_report(struct gusto_sim *sim)
 {
@@ -382,6 +366,7 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
       double dAz1[4] = VEC4_CROSS(dR1, dphi);
 
       /* Cell's centroid position */
+      C->x[0] = 0.0;
       C->x[1] = 0.25 * (C->verts[0]->x[0] + C->verts[1]->x[0] +
 			C->verts[2]->x[0] + C->verts[3]->x[0]);
       C->x[2] = 0.25 * (C->verts[0]->x[1] + C->verts[1]->x[1] +
@@ -424,5 +409,19 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
     F->nhat[1] = dA[1] / F->nhat[0];
     F->nhat[2] = dA[2] / F->nhat[0];
     F->nhat[3] = dA[3] / F->nhat[0];
+  }
+}
+
+
+
+void gusto_mesh_advance_vertices(struct gusto_sim *sim, double dt)
+{
+  struct mesh_vert *V;
+  for (int n=0; n<sim->num_rows; ++n) {
+    DL_FOREACH(sim->rows[n].verts, V) {
+      V->x[1] += V->v[1] * dt;
+      V->x[2] += V->v[2] * dt;
+      V->x[3] += V->v[3] * dt;
+    }
   }
 }

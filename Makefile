@@ -7,19 +7,15 @@ MAKEFILE_IN = $(PWD)/Makefile.in.template
 endif
 include $(MAKEFILE_IN)
 
-
-
 ifeq ($(HAVE_HDF5), 1)
 HDF5_I = -I$(HDF5_HOME)/include
 HDF5_L = -L$(HDF5_HOME)/lib -lhdf5
 endif
 
-
-SRC = gusto.c mesh.c ser.c quartic.c srmhd_c2p.c chkpt.c utils.c
+SRC = gusto.c mesh.c ser.c quartic.c srmhd_c2p.c chkpt.c utils.c physics.c
 OBJ = $(SRC:.c=.o)
 APP = gusto
 HEADERS = gusto.h
-
 
 default : $(APP)
 
@@ -39,5 +35,3 @@ $(APP) : $(OBJ)
 
 clean :
 	$(RM) $(APP) $(OBJ)
-
-.FORCE :

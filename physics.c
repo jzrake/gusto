@@ -1,18 +1,64 @@
-void gusto_initial_data(struct gusto_sim *sim)
+#include <stdio.h>
+#include <math.h>
+#include "utlist.h"
+#include "gusto.h"
+#include "srmhd_c2p.h"
+#include "quartic.h"
+
+
+
+void initial_data_cylindrical_shock(struct aux_variables *A, double *X)
 {
-  /* set initial data on cell volumes */
-  for (int j=0; j<sim->num_cells; ++j) {
-    double *X0 = sim->cells[j].verts[0]->x;
-    double *X1 = sim->cells[j].verts[1]->x;
-    double *X2 = sim->cells[j].verts[2]->x;
-    double *X3 = sim->cells[j].verts[3]->x;
-    double R = 0.25 * (X0[1] + X1[1] + X2[1] + X3[1]);
-    double z = 0.25 * (X0[3] + X1[3] + X2[3] + X3[3]);
-    double X[4] = {0, R, 0, z};
-    struct aux_variables *A = &sim->cells[j].aux[0];
-    initial_data_sound_wave(A, X);
-    gusto_vars_to_conserved(A, sim->cells[j].U, sim->cells[j].dA);
+  A->velocity_four_vector[1] = 0.0;
+  A->velocity_four_vector[2] = 0.0;
+  A->velocity_four_vector[3] = 0.0;
+  A->magnetic_four_vector[1] = 0.0;
+  A->magnetic_four_vector[2] = 0.0;
+  A->magnetic_four_vector[3] = 0.0;
+  double x = X[1] - 0.5;
+  double y = X[3] - 0.5;
+  if (sqrt(x*x + y*y) < 0.125) {
+    A->comoving_mass_density = 1.0;
+    A->gas_pressure = 1.0;
   }
+  else {
+    A->comoving_mass_density = 0.1;
+    A->gas_pressure = 1.0;
+  }
+  gusto_vars_complete_aux(A);
+}
+
+
+
+void initial_data_sound_wave(struct aux_variables *A, double *X)
+{
+  double k = 2 * M_PI;
+  double z = X[3];
+
+  double gm = gamma_law_index;
+  double d0 = 1.0;
+  double p0 = 1.0;
+  double u0 = 0.0;
+  double h0 = 1.0 + (p0/d0) * gm / (gm - 1);
+  double cs = sqrt(gm * p0 / d0 / h0);
+  double dd = 0.1;
+  double dp = cs * cs * dd;
+  double du = cs * dd / d0;
+
+  double d = d0 + dd * sin(k * z);
+  double p = p0 + dp * sin(k * z);
+  double u = u0 + du * sin(k * z);
+
+  A->velocity_four_vector[1] = u;
+  A->velocity_four_vector[2] = 0.0;
+  A->velocity_four_vector[3] = 0.0;
+  A->magnetic_four_vector[1] = 0.0;
+  A->magnetic_four_vector[2] = 0.0;
+  A->magnetic_four_vector[3] = 0.0;
+  A->comoving_mass_density = d;
+  A->gas_pressure = p;
+
+  gusto_vars_complete_aux(A);
 }
 
 
@@ -138,10 +184,10 @@ void gusto_riemann(struct aux_variables *AL,
   gusto_fluxes(AL, nhat, FL);
   gusto_fluxes(AR, nhat, FR);
 
-  double F_hll[8];
-  double U_hll[8];
   double Sm = gusto_min3(lamL[0], lamR[0], 0.0);
   double Sp = gusto_max3(lamL[7], lamR[7], 0.0);
+  double F_hll[8];
+  double U_hll[8];
 
   for (int q=0; q<8; ++q) {
     U_hll[q] = (Sp*UR[q] - Sm*UL[q] +       (FL[q] - FR[q])) / (Sp - Sm);
@@ -167,9 +213,9 @@ void gusto_riemann(struct aux_variables *AL,
 
 void gusto_compute_fluxes(struct gusto_sim *sim)
 {
-  for (int j=0; j<sim->num_faces; ++j) {
+  struct mesh_face *F;
+  DL_FOREACH(sim->faces, F) {
 
-    struct mesh_face *F = &sim->faces[j];
     struct mesh_cell *CL = F->cells[0];
     struct mesh_cell *CR = F->cells[1];
 
@@ -193,8 +239,8 @@ void gusto_compute_fluxes(struct gusto_sim *sim)
 
 void gusto_transmit_fluxes(struct gusto_sim *sim, double dt)
 {
-  for (int j=0; j<sim->num_faces; ++j) {
-    struct mesh_face *F = &sim->faces[j];
+  struct mesh_face *F;
+  DL_FOREACH(sim->faces, F) {
     struct mesh_cell *CL = F->cells[0];
     struct mesh_cell *CR = F->cells[1];
     for (int q=0; q<8; ++q) {
@@ -206,25 +252,13 @@ void gusto_transmit_fluxes(struct gusto_sim *sim, double dt)
 
 
 
-void gusto_move_vertices(struct gusto_sim *sim, double dt)
-{
-  for (int n=0; n<sim->num_rows; ++n) {
-    for (int i=0; i<sim->row_size[n]; ++i) {
-      struct mesh_vert *V = &sim->verts[n][i];
-      V->x[1] += dt * V->v[1];
-      V->x[2] += dt * V->v[2];
-      V->x[3] += dt * V->v[3];
-    }
-  }
-}
-
-
-
 void gusto_recover_variables(struct gusto_sim *sim)
 {
-  for (int j=0; j<sim->num_cells; ++j) {
-    struct mesh_cell *C = &sim->cells[j];
-    gusto_vars_from_conserved(C->aux, C->U, C->dA);
+  struct mesh_cell *C;
+  for (int n=0; n<sim->num_rows; ++n) {
+    DL_FOREACH(sim->rows[n].cells, C) {
+      gusto_vars_from_conserved(C->aux, C->U, C->dA);
+    }
   }
 }
 
@@ -232,12 +266,13 @@ void gusto_recover_variables(struct gusto_sim *sim)
 
 void gusto_compute_vertex_velocities(struct gusto_sim *sim)
 {
+  struct mesh_vert *V;
   for (int n=0; n<sim->num_rows; ++n) {
-    for (int i=0; i<sim->row_size[n]; ++i) {
-      double *u = sim->verts[n][i].aux[0].velocity_four_vector;
-      sim->verts[n][i].v[1] = u[1] / u[0];
-      sim->verts[n][i].v[2] = u[2] / u[0];
-      sim->verts[n][i].v[3] = u[3] / u[0];
+    DL_FOREACH(sim->rows[n].verts, V) {
+      double *u = V->aux[0].velocity_four_vector;
+      V->v[1] = u[1] / u[0];
+      V->v[2] = u[2] / u[0];
+      V->v[3] = u[3] / u[0];
     }
   }
 }
@@ -246,195 +281,63 @@ void gusto_compute_vertex_velocities(struct gusto_sim *sim)
 
 void gusto_enforce_boundary_condition(struct gusto_sim *sim)
 {
-  for (int n=0; n<sim->num_rows-1; ++n) {
+  /* for (int n=0; n<sim->num_rows-1; ++n) { */
 
-    struct mesh_cell *Cinner_bc = sim->verts[n][0].cell;
-    struct mesh_cell *Cinner_in = sim->verts[n][1].cell;
-    struct mesh_cell *Couter_in = sim->verts[n][sim->row_size[n]-3].cell;
-    struct mesh_cell *Couter_bc = sim->verts[n][sim->row_size[n]-2].cell;
+  /*   struct mesh_cell *Cinner_bc = sim->verts[n][0].cell; */
+  /*   struct mesh_cell *Cinner_in = sim->verts[n][1].cell; */
+  /*   struct mesh_cell *Couter_in = sim->verts[n][sim->row_size[n]-3].cell; */
+  /*   struct mesh_cell *Couter_bc = sim->verts[n][sim->row_size[n]-2].cell; */
 
-    Cinner_bc->aux[0] = Couter_in->aux[0];
-    Couter_bc->aux[0] = Cinner_in->aux[0];
+  /*   Cinner_bc->aux[0] = Couter_in->aux[0]; */
+  /*   Couter_bc->aux[0] = Cinner_in->aux[0]; */
 
-    gusto_vars_to_conserved(&Cinner_bc->aux[0], Cinner_bc->U, Cinner_bc->dA);
-    gusto_vars_to_conserved(&Couter_bc->aux[0], Couter_bc->U, Couter_bc->dA);
-  }
+  /*   gusto_vars_to_conserved(&Cinner_bc->aux[0], Cinner_bc->U, Cinner_bc->dA); */
+  /*   gusto_vars_to_conserved(&Couter_bc->aux[0], Couter_bc->U, Couter_bc->dA); */
+  /* } */
 }
 
 
 
 void gusto_compute_variables_at_vertices(struct gusto_sim *sim)
 {
-  for (int n=0; n<sim->num_rows; ++n) {
-    for (int i=0; i<sim->row_size[n]; ++i) {
-      for (int d=1; d<4; ++d) {
-	sim->verts[n][i].aux[0].velocity_four_vector[d] = 0.0;
-	sim->verts[n][i].aux[0].magnetic_four_vector[d] = 0.0;
-      }
-      sim->verts[n][i].aux[0].comoving_mass_density = 0.0;
-      sim->verts[n][i].aux[0].gas_pressure = 0.0;
-      sim->verts[n][i].num = 0;
-    }
-  }
+  /* for (int n=0; n<sim->num_rows; ++n) { */
+  /*   for (int i=0; i<sim->row_size[n]; ++i) { */
+  /*     for (int d=1; d<4; ++d) { */
+  /*	sim->verts[n][i].aux[0].velocity_four_vector[d] = 0.0; */
+  /*	sim->verts[n][i].aux[0].magnetic_four_vector[d] = 0.0; */
+  /*     } */
+  /*     sim->verts[n][i].aux[0].comoving_mass_density = 0.0; */
+  /*     sim->verts[n][i].aux[0].gas_pressure = 0.0; */
+  /*     sim->verts[n][i].num = 0; */
+  /*   } */
+  /* } */
 
-  for (int j=0; j<sim->num_cells; ++j) {
-    struct mesh_cell *C = &sim->cells[j];
-    for (int v=0; v<4; ++v) {
-      struct aux_variables *A = &C->verts[v]->aux[0];
-      C->verts[v]->num += 1;
-      for (int d=1; d<4; ++d) {
-	A->velocity_four_vector[d] += C->aux[0].velocity_four_vector[d];
-	A->magnetic_four_vector[d] += C->aux[0].magnetic_four_vector[d];
-      }
-      A->comoving_mass_density += C->aux[0].comoving_mass_density;
-      A->gas_pressure += C->aux[0].gas_pressure;
-    }
-  }
+  /* for (int j=0; j<sim->num_cells; ++j) { */
+  /*   struct mesh_cell *C = &sim->cells[j]; */
+  /*   for (int v=0; v<4; ++v) { */
+  /*     struct aux_variables *A = &C->verts[v]->aux[0]; */
+  /*     C->verts[v]->num += 1; */
+  /*     for (int d=1; d<4; ++d) { */
+  /*	A->velocity_four_vector[d] += C->aux[0].velocity_four_vector[d]; */
+  /*	A->magnetic_four_vector[d] += C->aux[0].magnetic_four_vector[d]; */
+  /*     } */
+  /*     A->comoving_mass_density += C->aux[0].comoving_mass_density; */
+  /*     A->gas_pressure += C->aux[0].gas_pressure; */
+  /*   } */
+  /* } */
 
-  for (int n=0; n<sim->num_rows; ++n) {
-    for (int i=0; i<sim->row_size[n]; ++i) {
-      int N = sim->verts[n][i].num;
-      for (int d=1; d<4; ++d) {
-	sim->verts[n][i].aux[0].velocity_four_vector[d] /= N;
-	sim->verts[n][i].aux[0].magnetic_four_vector[d] /= N;
-      }
-      sim->verts[n][i].aux[0].comoving_mass_density /= N;
-      sim->verts[n][i].aux[0].gas_pressure /= N;
-      gusto_vars_complete_aux(&sim->verts[n][i].aux[0]);
-    }
-  }
-}
-
-
-/*
- * Main function
- * =====================================================================
- */
-int main_run(int argc, char **argv)
-{
-  struct gusto_sim sim;
-  gusto_user_set_defaults(&sim.user);
-  gusto_status_set_defaults(&sim.status);
-
-
-  for (int n=1; n<argc; ++n) {
-    gusto_user_set_from_arg(&sim.user, argv[n]);
-  }
-
-
-  gusto_user_report(&sim.user);
-  gusto_generate_verts(&sim);
-  gusto_generate_cells(&sim);
-  gusto_generate_faces(&sim);
-  gusto_compute_mesh_geometry(&sim);
-  gusto_initial_data(&sim);
-
-
-  double dt = 0.25 * sim.smallest_cell_length;
-  sim.status.time_step = dt;
-
-  while (sim.status.time_simulation < sim.user.tmax) {
-
-    /*
-     * Write a checkpoint if it's time
-     * =================================================================
-     */
-    if (sim.status.time_simulation - sim.status.time_last_checkpoint >=
-	sim.user.cpi && sim.user.cpi > 0.0) {
-
-      sim.status.time_last_checkpoint += sim.user.cpi;
-      sim.status.checkpoint_number += 1;
-
-      gusto_write_checkpoint(&sim, NULL);
-    }
-
-    void *start_cycle = gusto_start_clock();
-
-    gusto_compute_variables_at_vertices(&sim);
-    gusto_compute_vertex_velocities(&sim);
-    gusto_compute_fluxes(&sim);
-    gusto_transmit_fluxes(&sim, dt);
-    gusto_move_vertices(&sim, dt);
-    gusto_compute_mesh_geometry(&sim);
-    gusto_recover_variables(&sim);
-    gusto_enforce_boundary_condition(&sim);
-
-    double seconds = gusto_stop_clock(start_cycle);
-
-    sim.status.kzps = 1e-3 * sim.num_cells / seconds;
-
-    if (sim.status.iteration % 1 == 0) {
-      printf("[gusto] n=%06d t=%6.4e dt=%6.4e %3.2f kzps\n",
-	     sim.status.iteration,
-	     sim.status.time_simulation,
-	     sim.status.time_step,
-	     sim.status.kzps);
-    }
-
-    sim.status.time_simulation += dt;
-    sim.status.iteration += 1;
-  }
-
-  gusto_free(&sim);
-  return 0;
-}
-
-
-void gusto_vars_complete_aux(struct aux_variables *A);
-
-
-void initial_data_cylindrical_shock(struct aux_variables *A, double *X)
-{
-  A->velocity_four_vector[1] = 0.0;
-  A->velocity_four_vector[2] = 0.0;
-  A->velocity_four_vector[3] = 0.0;
-  A->magnetic_four_vector[1] = 0.0;
-  A->magnetic_four_vector[2] = 0.0;
-  A->magnetic_four_vector[3] = 0.0;
-  double x = X[1] - 0.5;
-  double y = X[3] - 0.5;
-  if (sqrt(x*x + y*y) < 0.125) {
-    A->comoving_mass_density = 1.0;
-    A->gas_pressure = 1.0;
-  }
-  else {
-    A->comoving_mass_density = 0.1;
-    A->gas_pressure = 1.0;
-  }
-  gusto_vars_complete_aux(A);
-}
-
-
-
-void initial_data_sound_wave(struct aux_variables *A, double *X)
-{
-  double k = 2 * M_PI;
-  double z = X[3];
-
-  double gm = gamma_law_index;
-  double d0 = 1.0;
-  double p0 = 1.0;
-  double u0 = 0.0;
-  double h0 = 1.0 + (p0/d0) * gm / (gm - 1);
-  double cs = sqrt(gm * p0 / d0 / h0);
-  double dd = 0.1;
-  double dp = cs * cs * dd;
-  double du = cs * dd / d0;
-
-  double d = d0 + dd * sin(k * z);
-  double p = p0 + dp * sin(k * z);
-  double u = u0 + du * sin(k * z);
-
-  A->velocity_four_vector[1] = u;
-  A->velocity_four_vector[2] = 0.0;
-  A->velocity_four_vector[3] = 0.0;
-  A->magnetic_four_vector[1] = 0.0;
-  A->magnetic_four_vector[2] = 0.0;
-  A->magnetic_four_vector[3] = 0.0;
-  A->comoving_mass_density = d;
-  A->gas_pressure = p;
-
-  gusto_vars_complete_aux(A);
+  /* for (int n=0; n<sim->num_rows; ++n) { */
+  /*   for (int i=0; i<sim->row_size[n]; ++i) { */
+  /*     int N = sim->verts[n][i].num; */
+  /*     for (int d=1; d<4; ++d) { */
+  /*	sim->verts[n][i].aux[0].velocity_four_vector[d] /= N; */
+  /*	sim->verts[n][i].aux[0].magnetic_four_vector[d] /= N; */
+  /*     } */
+  /*     sim->verts[n][i].aux[0].comoving_mass_density /= N; */
+  /*     sim->verts[n][i].aux[0].gas_pressure /= N; */
+  /*     gusto_vars_complete_aux(&sim->verts[n][i].aux[0]); */
+  /*   } */
+  /* } */
 }
 
 
@@ -556,8 +459,22 @@ int gusto_vars_from_conserved(struct aux_variables *A, double U[8], double dA[4]
 
   if (error != 0) {
     printf("c2p failed: %s\n", srmhd_c2p_get_error(c2p, error));
-    printf("%f %f %f %f %f %f %f %f\n", Uin[0], Uin[1], Uin[2], Uin[3], Uin[4], Uin[5], Uin[6], Uin[7]);
+    printf("%f %f %f %f %f %f %f %f\n",
+	   Uin[0], Uin[1], Uin[2], Uin[3], Uin[4], Uin[5], Uin[6], Uin[7]);
   }
 
   return error;
+}
+
+
+
+void gusto_initial_data(struct gusto_sim *sim)
+{
+  struct mesh_cell *C;
+  for (int n=0; n<sim->num_rows; ++n) {
+    DL_FOREACH(sim->rows[n].cells, C) {
+      initial_data_sound_wave(&C->aux[0], C->x);
+      gusto_vars_to_conserved(&C->aux[0], C->U, C->dA);
+    }
+  }
 }

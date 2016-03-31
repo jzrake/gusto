@@ -1,19 +1,24 @@
 #ifndef GUSTO_HEADER
 #define GUSTO_HEADER
-
-
 #include "ser.h"
-#define gamma_law_index (4./3)
-
-/* indices into conserved variable arrays */
-enum { DDD, TAU, S11, S22, S33, B11, B22, B33 };
 
 
 
 /*
+ * =====================================================================
  * Data structures
  * =====================================================================
  */
+
+struct gusto_sim
+{
+  int num_rows;
+  double smallest_cell_length; /* for CFL condition */
+  struct gusto_user user;
+  struct gusto_status status;
+  struct mesh_face *faces;
+  struct mesh_row *rows;
+} ;
 
 struct aux_variables
 {
@@ -29,11 +34,10 @@ struct mesh_vert
 {
   double x[4];
   double v[4];
-  struct aux_variables aux[4];
-  struct mesh_cell *cell;
-  int num; /* temporary solution for averaging cells to verts */
   int row_index;
   int col_index;
+  struct aux_variables aux[4];
+  struct mesh_cell *cell;
   struct mesh_vert *next;
   struct mesh_vert *prev;
 } ;
@@ -66,39 +70,19 @@ struct mesh_row
   struct mesh_cell *cells;
 } ;
 
-struct gusto_sim
-{
-  struct gusto_user user;
-  struct gusto_status status;
-
-  int num_cells_max;
-  int num_cells;
-  int num_faces_max;
-  int num_faces;
-
-  int num_rows;
-  int *row_size;
-
-  double smallest_cell_length; /* for CFL condition */
-
-  struct mesh_vert **verts;
-  struct mesh_face *faces;
-  struct mesh_cell *cells;
-  struct mesh_row *rows;
-} ;
-
-
 
 
 /*
+ * =====================================================================
  * Function prototypes
  * =====================================================================
  */
-void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname);
+/* General utilities */
 void *gusto_start_clock();
 double gusto_stop_clock(void *clock_s);
 
 
+/* Mesh operations */
 int gusto_mesh_count(struct gusto_sim *sim, char which, int n);
 void gusto_mesh_report(struct gusto_sim *sim);
 void gusto_mesh_clear(struct gusto_sim *sim);
@@ -106,10 +90,73 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim);
 void gusto_mesh_generate_cells(struct gusto_sim *sim);
 void gusto_mesh_generate_faces(struct gusto_sim *sim);
 void gusto_mesh_compute_geometry(struct gusto_sim *sim);
+void gusto_mesh_advance_vertices(struct gusto_sim *sim, double dt);
+
+
+/* Initial data functions */
+void initial_data_cylindrical_shock(struct aux_variables *A, double *X);
+void initial_data_sound_wave(struct aux_variables *A, double *X);
+
+
+/* Operations on one or more variable states */
+void gusto_riemann(struct aux_variables *AL, struct aux_variables *AR,
+		   double nhat[4], double Fhat[8], double s);
+void gusto_vars_to_conserved(struct aux_variables *A, double U[8], double dA[4]);
+void gusto_vars_complete_aux(struct aux_variables *A);
+int gusto_vars_from_conserved(struct aux_variables *A, double U[8], double dA[4]);
+int gusto_wavespeeds(struct aux_variables *A, double n[4], double evals[8]);
+
+
+/* Operations on the whole simulation */
+void gusto_recover_variables(struct gusto_sim *sim);
+void gusto_initial_data(struct gusto_sim *sim);
+void gusto_compute_vertex_velocities(struct gusto_sim *sim);
+void gusto_enforce_boundary_condition(struct gusto_sim *sim);
+void gusto_compute_variables_at_vertices(struct gusto_sim *sim);
+void gusto_compute_fluxes(struct gusto_sim *sim);
+void gusto_transmit_fluxes(struct gusto_sim *sim, double dt);
+
+
+void gusto_free(struct gusto_sim *sim);
+void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname);
+
+
+/*
+ * =====================================================================
+ * Macro definitions
+ * =====================================================================
+ */
+
+#define DDD 0 /* indices into conserved variable arrays */
+#define TAU 1
+#define S11 2
+#define S22 3
+#define S33 4
+#define B11 5
+#define B22 6
+#define B33 7
+#define gamma_law_index (4./3)
 
 
 #define gusto_max3(a,b,c)(((a)>(b))?(((a)>(c))?(a):(c)):(((b)>(c))?(b):(c)))
 #define gusto_min3(a,b,c)(((a)<(b))?(((a)<(c))?(a):(c)):(((b)<(c))?(b):(c)))
+
+
+#define VEC4_SUB(x,y) {0,x[1]-y[1],x[2]-y[2],x[3]-y[3]}
+#define VEC4_ADD(x,y) {0,x[1]+y[1],x[2]+y[2],x[3]+y[3]}
+#define VEC4_DOT(x,y) (x[1]*y[1]+x[2]*y[2]+x[3]*y[3])
+#define VEC4_MOD(x) sqrt(VEC4_DOT(x,x))
+#define VEC4_CROSS(x,y) {0,			\
+			 x[2]*y[3]-x[3]*y[2],	\
+			 x[3]*y[1]-x[1]*y[3],	\
+			 x[1]*y[2]-x[2]*y[1]}
+#define VEC4_NORMALIZE(x) do {					\
+    double norm = sqrt(x[1]*x[1] + x[2]*x[2] + x[3]*x[3]);	\
+    x[1] /= norm;						\
+    x[2] /= norm;						\
+    x[3] /= norm;						\
+  } while (0)
+
 
 
 #endif /* GUSTO_HEADER */
