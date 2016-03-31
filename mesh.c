@@ -158,11 +158,11 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
       VR->x[1] = R0 + (n_real + 1) * dR;
       VL->x[2] = 0.0;
       VR->x[2] = 0.0;
-      VL->x[3] = z0 + i_real * dz + 0.5 * dz * (n % 2 == 0);
-      VR->x[3] = z0 + i_real * dz + 0.5 * dz * (n % 2 == 0);
+      VL->x[3] = z0 + i_real * dz + 1.25 * dz * (n % 2 == 0);
+      VR->x[3] = z0 + i_real * dz + 1.25 * dz * (n % 2 == 0);
 
-      VL->x[1] += 0.05 * ((double) rand() / RAND_MAX - 0.5);
-      VL->x[3] += 0.05 * ((double) rand() / RAND_MAX - 0.5);
+      VL->x[1] += 0.0 * ((double) rand() / RAND_MAX - 0.5);
+      VL->x[3] += 0.0 * ((double) rand() / RAND_MAX - 0.5);
 
       for (int d=0; d<4; ++d) { /* vertex velocities */
 	VL->v[d] = 0.0;
@@ -253,18 +253,21 @@ void gusto_mesh_generate_faces(struct gusto_sim *sim)
 
     Vm = sim->rows[n+0].verts->next;
     Vp = sim->rows[n+1].verts;
-    Cm = sim->rows[n+0].cells;
-    Cp = sim->rows[n+1].cells;
+    Cm = NULL;
+    Cp = NULL;
 
     if (Vm->x[3] < Vp->x[3]) {
       V0 = Vm;
       Vm = Vm->next->next;
+      Cm = sim->rows[n+0].cells;
     }
     else {
       V0 = Vp;
       Vp = Vp->next->next;
+      Cp = sim->rows[n+1].cells;
     }
 
+    char which;
     int proceed = 1;
 
     /*
@@ -286,21 +289,27 @@ void gusto_mesh_generate_faces(struct gusto_sim *sim)
 
       if (Vm && Vp) {
 	if (Vm->x[3] < Vp->x[3]) {
+	  which = 'm';
 	  V1 = Vm;
 	  Vm = Vm->next ? Vm->next->next : NULL;
 	}
 	else {
+	  which = 'p';
 	  V1 = Vp;
 	  Vp = Vp->next ? Vp->next->next : NULL;
 	}
       }
       else if (Vm) {
+	which = 'm';
 	V1 = Vm;
-	proceed = Vm->next && Vm->next->next;
+	Vm = Vm->next ? Vm->next->next : NULL;
+	proceed = Vm != NULL;
       }
       else if (Vp) {
+	which = 'p';
 	V1 = Vp;
-	proceed = Vp->next && Vp->next->next;
+	Vp = Vp->next ? Vp->next->next : NULL;
+	proceed = Vp != NULL;
       }
 
       F = (struct mesh_face *) malloc(sizeof(struct mesh_face));
@@ -310,6 +319,30 @@ void gusto_mesh_generate_faces(struct gusto_sim *sim)
       F->cells[0] = Cm;
       F->cells[1] = Cp;
       V0 = V1;
+
+      /* Now we advance the cell on the side of the vertex that advanced. The
+	 first face always borders only one cell, thus on the first one or more
+	 iterations, either Cm or Cp is NULL. Similarly, on the last one or more
+	 iterations either Cm or Cp may be NULL.
+	 */
+
+      if (which == 'm') {
+	if (Vm) { /* m side is still active */
+	  Cm = Cm ? Cm->next : sim->rows[n+0].cells;
+	}
+	else {
+	  Cm = NULL;
+	}
+      }
+
+      if (which == 'p') {
+	if (Vp) { /* p side is still active */
+	  Cp = Cp ? Cp->next : sim->rows[n+1].cells;
+	}
+	else {
+	  Cp = NULL;
+	}
+      }
     }
   }
 }
