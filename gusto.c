@@ -26,6 +26,7 @@ int main(int argc, char **argv)
   gusto_mesh_generate_verts(&sim);
   gusto_mesh_generate_cells(&sim);
   gusto_mesh_generate_faces(&sim);
+  gusto_mesh_report(&sim);
   gusto_mesh_compute_geometry(&sim);
   gusto_write_checkpoint(&sim, NULL);
 

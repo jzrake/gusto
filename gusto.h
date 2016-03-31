@@ -100,6 +100,7 @@ double gusto_stop_clock(void *clock_s);
 
 
 int gusto_mesh_count(struct gusto_sim *sim, char which, int n);
+void gusto_mesh_report(struct gusto_sim *sim);
 void gusto_mesh_clear(struct gusto_sim *sim);
 void gusto_mesh_generate_verts(struct gusto_sim *sim);
 void gusto_mesh_generate_cells(struct gusto_sim *sim);

@@ -22,34 +22,12 @@
 
 
 
-int gusto_mesh_count(struct gusto_sim *sim, char which, int n)
+void gusto_mesh_report(struct gusto_sim *sim)
 {
-  struct mesh_vert *V;
-  struct mesh_cell *C;
-  struct mesh_face *F;
-  int count = 0;
-
-  if (n == -1) {
-    for (int m=0; m<sim->num_rows; ++m) {
-      count += gusto_mesh_count(sim, which, m);
-    }
-  }
-
-  else {
-    switch (which) {
-    case 'v':
-      DL_COUNT(sim->rows[n].verts, V, count);
-      break;
-    case 'c':
-      DL_COUNT(sim->rows[n].cells, C, count);
-      break;
-    case 'f':
-      DL_COUNT(sim->faces, F, count);
-      break;
-    }
-  }
-
-  return count;
+  printf("[gusto] number rows  ... %d\n", sim->num_rows);
+  printf("[gusto] number verts ... %d\n", gusto_mesh_count(sim, 'v', -1));
+  printf("[gusto] number cells ... %d\n", gusto_mesh_count(sim, 'c', -1));
+  printf("[gusto] number faces ... %d\n", gusto_mesh_count(sim, 'f', -1));
 }
 
 
@@ -82,12 +60,44 @@ void gusto_mesh_clear(struct gusto_sim *sim)
 
 
 
+int gusto_mesh_count(struct gusto_sim *sim, char which, int n)
+{
+  struct mesh_vert *V;
+  struct mesh_cell *C;
+  struct mesh_face *F;
+  int count = 0;
+
+  if (n == -1) {
+    for (int m=0; m<sim->num_rows; ++m) {
+      count += gusto_mesh_count(sim, which, m);
+    }
+  }
+
+  else {
+    switch (which) {
+    case 'v':
+      DL_COUNT(sim->rows[n].verts, V, count);
+      break;
+    case 'c':
+      DL_COUNT(sim->rows[n].cells, C, count);
+      break;
+    case 'f':
+      DL_COUNT(sim->faces, F, count);
+      break;
+    }
+  }
+
+  return count;
+}
+
+
+
 void gusto_mesh_generate_verts(struct gusto_sim *sim)
 {
-  sim->num_rows = sim->user.N[0];
+  sim->num_rows = sim->user.N[1];
   sim->rows = (struct mesh_row *) malloc(sim->num_rows*sizeof(struct mesh_row));
 
-  int row_size = sim->user.N[1];
+  int row_size = sim->user.N[0];
   int ngR = 0; /* number of ghost cells in the R direction */
   int ngz = 0; /* number of ghost cells in the z direction */
   double R0 = 0.0;
@@ -160,8 +170,6 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
       DL_APPEND(sim->rows[n].verts, VR);
     }
   }
-  printf("[gusto] number rows  ... %d\n", sim->num_rows);
-  printf("[gusto] number verts ... %d\n", gusto_mesh_count(sim, 'v', -1));
 }
 
 
@@ -188,7 +196,6 @@ void gusto_mesh_generate_cells(struct gusto_sim *sim)
       DL_APPEND(sim->rows[n].cells, C);
     }
   }
-  printf("[gusto] number cells ... %d\n", gusto_mesh_count(sim, 'c', -1));
 }
 
 
@@ -232,7 +239,6 @@ void gusto_mesh_generate_faces(struct gusto_sim *sim)
       }
     }
   }
-  printf("[gusto] number faces ... %d\n", gusto_mesh_count(sim, 'f', -1));
 }
 
 
