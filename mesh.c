@@ -27,7 +27,7 @@ void gusto_mesh_report(struct gusto_sim *sim)
   printf("[gusto] number rows  ... %d\n", sim->num_rows);
   printf("[gusto] number verts ... %d\n", gusto_mesh_count(sim, 'v', -1));
   printf("[gusto] number cells ... %d\n", gusto_mesh_count(sim, 'c', -1));
-  printf("[gusto] number faces ... %d\n", gusto_mesh_count(sim, 'f', -1));
+  printf("[gusto] number faces ... %d\n", gusto_mesh_count(sim, 'f', 0));
 }
 
 
@@ -158,8 +158,11 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
       VR->x[1] = R0 + (n_real + 1) * dR;
       VL->x[2] = 0.0;
       VR->x[2] = 0.0;
-      VL->x[3] = z0 + i_real * dz;
-      VR->x[3] = z0 + i_real * dz;
+      VL->x[3] = z0 + i_real * dz + 0.5 * dz * (n % 2 == 0);
+      VR->x[3] = z0 + i_real * dz + 0.5 * dz * (n % 2 == 0);
+
+      VL->x[1] += 0.05 * ((double) rand() / RAND_MAX - 0.5);
+      VL->x[3] += 0.05 * ((double) rand() / RAND_MAX - 0.5);
 
       for (int d=0; d<4; ++d) { /* vertex velocities */
 	VL->v[d] = 0.0;
@@ -237,6 +240,76 @@ void gusto_mesh_generate_faces(struct gusto_sim *sim)
       else {
 	break;
       }
+    }
+  }
+
+
+  for (int n=0; n<sim->num_rows-1; ++n) {
+
+    struct mesh_vert *V0, *V1;
+    struct mesh_vert *Vm, *Vp;
+    struct mesh_cell *Cm, *Cp;
+    struct mesh_face *F;
+
+    Vm = sim->rows[n+0].verts->next;
+    Vp = sim->rows[n+1].verts;
+    Cm = sim->rows[n+0].cells;
+    Cp = sim->rows[n+1].cells;
+
+    if (Vm->x[3] < Vp->x[3]) {
+      V0 = Vm;
+      Vm = Vm->next->next;
+    }
+    else {
+      V0 = Vp;
+      Vp = Vp->next->next;
+    }
+
+    int proceed = 1;
+
+    /*
+     * -------------------------------------------------------------------------
+     * We start with a face F that is attached at its lower end to the vertex
+     * V0. There are two possible vertices to which F might be attached at the
+     * other end - Vm and Vp, which are on the left and right of the bounding
+     * surface respectively. The correct one is whichever has the smaller z
+     * coordinate. If that is Vp, then we attach the other end of F to V1 = Vp,
+     * and advance Vp to the next vertex along its of the surface. We then add
+     * that face to the list, reset V0 = V1, and begin a new face whose lower
+     * end point is the new V0. If either Vp or Vm is NULL, then we are out of
+     * vertices on that side. In that case, the construction is finished when
+     * the next vertex on the remaining side is also NULL.
+     * -------------------------------------------------------------------------
+     */
+
+    while (proceed) {
+
+      if (Vm && Vp) {
+	if (Vm->x[3] < Vp->x[3]) {
+	  V1 = Vm;
+	  Vm = Vm->next ? Vm->next->next : NULL;
+	}
+	else {
+	  V1 = Vp;
+	  Vp = Vp->next ? Vp->next->next : NULL;
+	}
+      }
+      else if (Vm) {
+	V1 = Vm;
+	proceed = Vm->next && Vm->next->next;
+      }
+      else if (Vp) {
+	V1 = Vp;
+	proceed = Vp->next && Vp->next->next;
+      }
+
+      F = (struct mesh_face *) malloc(sizeof(struct mesh_face));
+      DL_APPEND(sim->faces, F);
+      F->verts[0] = V0;
+      F->verts[1] = V1;
+      F->cells[0] = Cm;
+      F->cells[1] = Cp;
+      V0 = V1;
     }
   }
 }
