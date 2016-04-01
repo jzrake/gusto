@@ -116,9 +116,9 @@ void vert_pos_radial(struct gusto_sim *sim, struct mesh_vert *V,
   double t = t0 + dt * n;
 
   V->x[0] = 0.0;
-  V->x[1] = r * sin(t);
+  V->x[1] = r * cos(t);
   V->x[2] = 0.0;
-  V->x[3] = r * cos(t);
+  V->x[3] = r * sin(t);
 }
 
 
@@ -178,11 +178,11 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
       VL->col_index = 2*i + 0;
       VR->col_index = 2*i + 1;
 
-      //vert_pos_radial(sim, VL, n_real+0, i_real, NR, Nz);
-      //vert_pos_radial(sim, VR, n_real+1, i_real, NR, Nz);
+      vert_pos_radial(sim, VL, n_real+0, i_real, NR, Nz, 0);
+      vert_pos_radial(sim, VR, n_real+1, i_real, NR, Nz, 0);
 
-      vert_pos_staggered_cartesian(sim, VL, n_real+0, i_real, NR, Nz, n_real%2);
-      vert_pos_staggered_cartesian(sim, VR, n_real+1, i_real, NR, Nz, n_real%2);
+      /* vert_pos_staggered_cartesian(sim, VL, n_real+0, i_real, NR, Nz, n_real%2); */
+      /* vert_pos_staggered_cartesian(sim, VR, n_real+1, i_real, NR, Nz, n_real%2); */
 
       for (int d=0; d<4; ++d) { /* vertex velocities */
 	VL->v[d] = 0.0;
@@ -414,7 +414,13 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
       C->dA[2] = 0.25 * (VEC4_MOD(dAf0) + VEC4_MOD(dAf1) +
 			 VEC4_MOD(dAf2) + VEC4_MOD(dAf3));
       C->dA[3] = 0.50 * (VEC4_MOD(dAz0) + VEC4_MOD(dAz1));
-      C->dA[0] = C->dA[2]; /* Volume and phi cross section are the same */
+
+      if (sim->user.coordinates == 'p') {
+	C->dA[0] = C->dA[2] * C->x[1]; /* area is per steradian */
+      }
+      else {
+	C->dA[0] = C->dA[2];
+      }
 
       /* Cell's longitudinal axis */
       C->zhat[0] = 0.0;

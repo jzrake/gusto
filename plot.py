@@ -9,20 +9,16 @@ import gusto_dataset
 def plot_faces(filename):
     dset = gusto_dataset.GustoDataset(filename)
     segments = dset.get_face_segments()
-
     for seg in segments:
         plt.plot(seg[:,0], seg[:,2], '-o', c='k')
-
     plt.axis('equal')
-
 
 
 def plot_1d(filename):
     dset = gusto_dataset.GustoDataset(filename)
-    x = dset.get_cell_variable('x3')[0]
-    y = dset.get_cell_variable('dg')[0]
+    x = dset.get_cell_variable('x1')
+    y = dset.get_cell_variable('dg')
     plt.plot(x, y, '-o')
-
 
 
 def triangle_variable_plot(filename):
@@ -49,7 +45,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    plots = {'trimesh': triangle_mesh_plot,
+    plots = {'1d': plot_1d,
+             'trimesh': triangle_mesh_plot,
              'triplot': triangle_variable_plot,
              'faces': plot_faces}
 

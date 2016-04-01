@@ -53,9 +53,9 @@ void initial_data_density_wave(struct aux_variables *A, double *X)
 {
   double k = 2 * M_PI;
   double z = X[3];
-  double d = 1.0 + 0.1 * sin(k * z);
+  double d = 1.0 + 0.0 * sin(k * z);
 
-  A->velocity_four_vector[3] = 1.0;
+  A->velocity_four_vector[3] = 0.0;
   A->comoving_mass_density = d;
   A->gas_pressure = 1.0;
 }
@@ -80,11 +80,16 @@ void gusto_initial_data(struct gusto_sim *sim)
       A->magnetic_four_vector[2] = 0.0;
       A->magnetic_four_vector[3] = 0.0;
 
-      //initial_data_density_wave(A, C->x);
-      initial_data_cylindrical_shock(A, C->x);
+      if (sim->user.coordinates == 'p') {
+	A->R = C->x[1];
+      }
 
-      gusto_vars_complete_aux(A);
-      gusto_vars_to_conserved(A, C->U, C->dA);
+      //initial_data_density_wave(A, C->x);
+      //initial_data_cylindrical_shock(A, C->x);
+      initial_data_density_wave(A, C->x);
+
+      gusto_complete_aux(A);
+      gusto_to_conserved(A, C->U, C->dA);
     }
   }
 }
@@ -132,12 +137,31 @@ void gusto_transmit_fluxes(struct gusto_sim *sim, double dt)
 
 
 
+void gusto_add_source_terms(struct gusto_sim *sim, double dt)
+{
+  struct mesh_cell *C;
+  double Udot[8];
+  for (int n=0; n<sim->num_rows; ++n) {
+    DL_FOREACH(sim->rows[n].cells, C) {
+      if (sim->user.coordinates == 'p') {
+	gusto_cylindrical_source_terms(&C->aux[0], Udot);
+	for (int q=0; q<8; ++q) {
+	  C->U[q] += Udot[q] * C->dA[0] * dt;
+	}
+	//printf("adding source %f %f\n", Udot[2], C->U[2]);
+      }
+    }
+  }
+}
+
+
+
 void gusto_recover_variables(struct gusto_sim *sim)
 {
   struct mesh_cell *C;
   for (int n=0; n<sim->num_rows; ++n) {
     DL_FOREACH(sim->rows[n].cells, C) {
-      gusto_vars_from_conserved(C->aux, C->U, C->dA);
+      gusto_from_conserved(C->aux, C->U, C->dA);
     }
   }
 }
@@ -171,11 +195,11 @@ void gusto_enforce_boundary_condition(struct gusto_sim *sim)
     struct mesh_cell *Cinner_in = Cinner_bc->next;
     struct mesh_cell *Couter_in = Couter_bc->prev;
 
-    Cinner_bc->aux[0] = Couter_in->aux[0];
-    Couter_bc->aux[0] = Cinner_in->aux[0];
+    /* Cinner_bc->aux[0] = Couter_in->aux[0]; */
+    /* Couter_bc->aux[0] = Cinner_in->aux[0]; */
 
-    gusto_vars_to_conserved(&Cinner_bc->aux[0], Cinner_bc->U, Cinner_bc->dA);
-    gusto_vars_to_conserved(&Couter_bc->aux[0], Couter_bc->U, Couter_bc->dA);
+    /* gusto_to_conserved(&Cinner_bc->aux[0], Cinner_bc->U, Cinner_bc->dA); */
+    /* gusto_to_conserved(&Couter_bc->aux[0], Couter_bc->U, Couter_bc->dA); */
   }
 }
 
@@ -208,14 +232,14 @@ void gusto_compute_variables_at_vertices(struct gusto_sim *sim)
     }
 
     DL_FOREACH(sim->rows[n].verts, V) {
-      gusto_vars_complete_aux(&V->aux[0]);
+      gusto_complete_aux(&V->aux[0]);
     }
   }
 }
 
 
 
-void gusto_vars_complete_aux(struct aux_variables *A)
+void gusto_complete_aux(struct aux_variables *A)
 /*
  * Fills out all primitive variables provided the following are already valid:
  *
@@ -245,11 +269,12 @@ void gusto_vars_complete_aux(struct aux_variables *A)
   A->momentum_density[2] = H0 * u[0] * u[2] - b[0] * b[2];
   A->momentum_density[3] = H0 * u[0] * u[3] - b[0] * b[3];
   A->magnetic_pressure = pb;
+  A->enthalpy_density = H0;
 }
 
 
 
-void gusto_vars_to_conserved(struct aux_variables *A, double U[8], double dA[4])
+void gusto_to_conserved(struct aux_variables *A, double U[8], double dA[4])
 {
   double *b = A->magnetic_four_vector;
   double *u = A->velocity_four_vector;
@@ -261,13 +286,11 @@ void gusto_vars_to_conserved(struct aux_variables *A, double U[8], double dA[4])
   double b1 = b[1];
   double b2 = b[2];
   double b3 = b[3];
-  double bb = b1*b1 + b2*b2 + b3*b3 - b0*b0;
   double dg = A->comoving_mass_density;
   double pg = A->gas_pressure;
-  double ug = pg / (gamma_law_index - 1.0);
-  double pb = 0.5 * bb;
-  double ub = 0.5 * bb;
-  double H0 = dg + (ug + ub) + (pg + pb);
+  double pb = A->magnetic_pressure;
+  double H0 = A->enthalpy_density;
+
   U[DDD] = dA[0] * (dg * u0);
   U[TAU] = dA[0] * (H0 * u0 * u0 - b0 * b0 - (pg + pb) - dg * u0);
   U[S11] = dA[0] * (H0 * u0 * u1 - b0 * b1);
@@ -276,11 +299,13 @@ void gusto_vars_to_conserved(struct aux_variables *A, double U[8], double dA[4])
   U[B11] = dA[1] * (b1 * u0 - u1 * b0);
   U[B22] = dA[2] * (b2 * u0 - u2 * b0);
   U[B33] = dA[3] * (b3 * u0 - u3 * b0);
+
+  U[S22] *= A->R; /* if in cylindrical coordinates */
 }
 
 
 
-int gusto_vars_from_conserved(struct aux_variables *A, double U[8], double dA[4])
+int gusto_from_conserved(struct aux_variables *A, double U[8], double dA[4])
 {
   double Uin[8]; /* conserved densities */
   double Pin[8]; /* primitive variables d, p, v, B */
@@ -294,6 +319,8 @@ int gusto_vars_from_conserved(struct aux_variables *A, double U[8], double dA[4]
   Uin[B11] = U[B11] / dA[1];
   Uin[B22] = U[B22] / dA[2]; /* toroidal field (along phi) */
   Uin[B33] = U[B33] / dA[3]; /* poloidal field (along z) */
+
+  Uin[S22] /= A->R;
 
   srmhd_c2p_set_pressure_floor(c2p, -1.0);
   srmhd_c2p_set_gamma(c2p, gamma_law_index);
@@ -326,7 +353,7 @@ int gusto_vars_from_conserved(struct aux_variables *A, double U[8], double dA[4]
   A->magnetic_four_vector[1] = b1;
   A->magnetic_four_vector[2] = b2;
   A->magnetic_four_vector[3] = b3;
-  gusto_vars_complete_aux(A);
+  gusto_complete_aux(A);
 
   srmhd_c2p_del(c2p);
 
@@ -430,6 +457,7 @@ int gusto_fluxes(struct aux_variables *A, double n[4], double F[8])
   const double B3 = b3 * u0 - b0 * u3;
   const double Bn = B1*n1 + B2*n2 + B3*n3;
   const double vn = v1*n1 + v2*n2 + v3*n3;
+
   F[DDD] = D0 * vn;
   F[TAU] = T0 * vn + (pg + pb) * vn - b0 * Bn / u0;
   F[S11] = S1 * vn + (pg + pb) * n1 - b1 * Bn / u0;
@@ -438,7 +466,23 @@ int gusto_fluxes(struct aux_variables *A, double n[4], double F[8])
   F[B11] = B1 * vn - Bn * v1;
   F[B22] = B2 * vn - Bn * v2;
   F[B33] = B3 * vn - Bn * v3;
+
+  F[S22] *= A->R; /* if in cylindrical coordinates */
+
   return 0;
+}
+
+
+
+void gusto_cylindrical_source_terms(struct aux_variables *A, double Udot[8])
+{
+  double *u = A->velocity_four_vector;
+  double *b = A->magnetic_four_vector;
+  double pg = A->gas_pressure;
+  double pb = A->magnetic_pressure;
+  double H0 = A->enthalpy_density;
+
+  Udot[S11] = (pg + pb + u[3]*u[3]*H0 - b[3]*b[3]) / A->R;
 }
 
 
@@ -458,8 +502,8 @@ void gusto_riemann(struct aux_variables *AL,
 
   gusto_wavespeeds(AL, nhat, lamL);
   gusto_wavespeeds(AR, nhat, lamR);
-  gusto_vars_to_conserved(AL, UL, dA_unit);
-  gusto_vars_to_conserved(AR, UR, dA_unit);
+  gusto_to_conserved(AL, UL, dA_unit);
+  gusto_to_conserved(AR, UR, dA_unit);
   gusto_fluxes(AL, nhat, FL);
   gusto_fluxes(AR, nhat, FR);
 

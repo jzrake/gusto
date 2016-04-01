@@ -28,6 +28,8 @@ struct aux_variables
   double comoving_mass_density;
   double gas_pressure;
   double magnetic_pressure;
+  double enthalpy_density;
+  double R; /* factor for cylindrical coordinates */
 } ;
 
 struct mesh_vert
@@ -101,10 +103,13 @@ void initial_data_sound_wave(struct aux_variables *A, double *X);
 /* Operations on one or more variable states */
 void gusto_riemann(struct aux_variables *AL, struct aux_variables *AR,
 		   double nhat[4], double Fhat[8], double s);
-void gusto_vars_to_conserved(struct aux_variables *A, double U[8], double dA[4]);
-void gusto_vars_complete_aux(struct aux_variables *A);
-int gusto_vars_from_conserved(struct aux_variables *A, double U[8], double dA[4]);
+void gusto_to_conserved(struct aux_variables *A, double U[8], double dA[4]);
+void gusto_complete_aux(struct aux_variables *A);
+void gusto_cylindrical_source_terms(struct aux_variables *A, double Udot[8]);
+int gusto_from_conserved(struct aux_variables *A, double U[8], double dA[4]);
 int gusto_wavespeeds(struct aux_variables *A, double n[4], double evals[8]);
+int gusto_fluxes(struct aux_variables *A, double n[4], double F[8]);
+
 
 
 /* Operations on the whole simulation */
@@ -115,6 +120,7 @@ void gusto_enforce_boundary_condition(struct gusto_sim *sim);
 void gusto_compute_variables_at_vertices(struct gusto_sim *sim);
 void gusto_compute_fluxes(struct gusto_sim *sim);
 void gusto_transmit_fluxes(struct gusto_sim *sim, double dt);
+void gusto_add_source_terms(struct gusto_sim *sim, double dt);
 
 
 void gusto_free(struct gusto_sim *sim);

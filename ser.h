@@ -9,6 +9,7 @@ struct gusto_user {
     int N[2];
     int ng[2];
     double domain[4];
+    char coordinates;
     int move_cells;
 };
 

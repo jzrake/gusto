@@ -85,6 +85,7 @@ int main(int argc, char **argv)
 
     gusto_compute_fluxes(&sim);
     gusto_transmit_fluxes(&sim, dt);
+    gusto_add_source_terms(&sim, dt);
 
     if (sim.user.move_cells) {
       gusto_compute_variables_at_vertices(&sim);

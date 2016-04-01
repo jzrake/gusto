@@ -13,6 +13,7 @@ user_struct = [
     ('N', 'int[2]', [128, 1]),
     ('ng', 'int[2]', [0, 0]),
     ('domain', 'double[4]', [0, 1, 0, 1]),
+    ('coordinates', 'char', 'c'),
     ('move_cells', 'int', 1),
 ]
 
