@@ -142,8 +142,8 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
       VR->x[1] = R0 + (n_real + 1) * dR;
       VL->x[2] = 0.0;
       VR->x[2] = 0.0;
-      VL->x[3] = z0 + i_real * dz + 1.25 * dz * (n % 2 == 0);
-      VR->x[3] = z0 + i_real * dz + 1.25 * dz * (n % 2 == 0);
+      VL->x[3] = z0 + i_real * dz + 0.0 * dz * (n % 2 == 0);
+      VR->x[3] = z0 + i_real * dz + 0.0 * dz * (n % 2 == 0);
 
       VL->x[1] += 0.0 * ((double) rand() / RAND_MAX - 0.5);
       VL->x[3] += 0.0 * ((double) rand() / RAND_MAX - 0.5);
@@ -367,12 +367,12 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
 
       /* Cell's centroid position */
       C->x[0] = 0.0;
-      C->x[1] = 0.25 * (C->verts[0]->x[0] + C->verts[1]->x[0] +
-			C->verts[2]->x[0] + C->verts[3]->x[0]);
-      C->x[2] = 0.25 * (C->verts[0]->x[1] + C->verts[1]->x[1] +
+      C->x[1] = 0.25 * (C->verts[0]->x[1] + C->verts[1]->x[1] +
 			C->verts[2]->x[1] + C->verts[3]->x[1]);
-      C->x[3] = 0.25 * (C->verts[0]->x[2] + C->verts[1]->x[2] +
+      C->x[2] = 0.25 * (C->verts[0]->x[2] + C->verts[1]->x[2] +
 			C->verts[2]->x[2] + C->verts[3]->x[2]);
+      C->x[3] = 0.25 * (C->verts[0]->x[3] + C->verts[1]->x[3] +
+			C->verts[2]->x[3] + C->verts[3]->x[3]);
 
       /* Cell's area and volume forms */
       C->dA[1] = 0.50 * (VEC4_MOD(dAR0) + VEC4_MOD(dAR1));

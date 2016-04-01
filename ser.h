@@ -7,6 +7,7 @@ struct gusto_user {
     double tmax;
     double cpi;
     int N[2];
+    int move_cells;
 };
 
 

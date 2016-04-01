@@ -11,6 +11,7 @@ user_struct = [
     ('tmax', 'double', 1.0),
     ('cpi', 'double', 1.0),
     ('N', 'int[2]', [128, 1]),
+    ('move_cells', 'int', 1),
 ]
 
 

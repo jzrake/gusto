@@ -22,6 +22,13 @@ class GustoDataset(object):
             verts.append(coords)
         return verts
 
+    def get_cell_variable(self, key):
+        cells = [ ]
+        for row in self.h5f['rows']:
+            var = self.h5f['rows'][row]['cells'][key][:]
+            cells.append(var)
+        return cells
+
     def get_face_segments(self):
         verts = self.get_vertex_positions()
         faces = self.h5f['faces'][:]

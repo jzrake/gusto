@@ -9,12 +9,6 @@
 
 void initial_data_cylindrical_shock(struct aux_variables *A, double *X)
 {
-  A->velocity_four_vector[1] = 0.0;
-  A->velocity_four_vector[2] = 0.0;
-  A->velocity_four_vector[3] = 0.0;
-  A->magnetic_four_vector[1] = 0.0;
-  A->magnetic_four_vector[2] = 0.0;
-  A->magnetic_four_vector[3] = 0.0;
   double x = X[1] - 0.5;
   double y = X[3] - 0.5;
   if (sqrt(x*x + y*y) < 0.125) {
@@ -25,7 +19,6 @@ void initial_data_cylindrical_shock(struct aux_variables *A, double *X)
     A->comoving_mass_density = 0.1;
     A->gas_pressure = 1.0;
   }
-  gusto_vars_complete_aux(A);
 }
 
 
@@ -49,16 +42,22 @@ void initial_data_sound_wave(struct aux_variables *A, double *X)
   double p = p0 + dp * sin(k * z);
   double u = u0 + du * sin(k * z);
 
-  A->velocity_four_vector[1] = u;
-  A->velocity_four_vector[2] = 0.0;
-  A->velocity_four_vector[3] = 0.0;
-  A->magnetic_four_vector[1] = 0.0;
-  A->magnetic_four_vector[2] = 0.0;
-  A->magnetic_four_vector[3] = 0.0;
+  A->velocity_four_vector[3] = u;
   A->comoving_mass_density = d;
   A->gas_pressure = p;
+}
 
-  gusto_vars_complete_aux(A);
+
+
+void initial_data_density_wave(struct aux_variables *A, double *X)
+{
+  double k = 2 * M_PI;
+  double z = X[3];
+  double d = 1.0 + 0.1 * sin(k * z);
+
+  A->velocity_four_vector[3] = 1.0;
+  A->comoving_mass_density = d;
+  A->gas_pressure = 1.0;
 }
 
 
@@ -68,11 +67,27 @@ void gusto_initial_data(struct gusto_sim *sim)
   struct mesh_cell *C;
   for (int n=0; n<sim->num_rows; ++n) {
     DL_FOREACH(sim->rows[n].cells, C) {
-      initial_data_sound_wave(&C->aux[0], C->x);
-      gusto_vars_to_conserved(&C->aux[0], C->U, C->dA);
+
+      struct aux_variables *A = &C->aux[0];
+
+      /* some defaults */
+      A->comoving_mass_density = 1;
+      A->gas_pressure = 1;
+      A->velocity_four_vector[1] = 0.0;
+      A->velocity_four_vector[2] = 0.0;
+      A->velocity_four_vector[3] = 0.0;
+      A->magnetic_four_vector[1] = 0.0;
+      A->magnetic_four_vector[2] = 0.0;
+      A->magnetic_four_vector[3] = 0.0;
+
+      initial_data_density_wave(A, C->x);
+
+      gusto_vars_complete_aux(A);
+      gusto_vars_to_conserved(A, C->U, C->dA);
     }
   }
 }
+
 
 
 void gusto_compute_fluxes(struct gusto_sim *sim)

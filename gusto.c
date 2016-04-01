@@ -18,6 +18,8 @@ void gusto_free(struct gusto_sim *sim)
 int main(int argc, char **argv)
 {
   struct gusto_sim sim;
+  int restarted_run = 0;
+
   gusto_user_set_defaults(&sim.user);
   gusto_status_set_defaults(&sim.status);
 
@@ -25,6 +27,21 @@ int main(int argc, char **argv)
   for (int n=1; n<argc; ++n) {
     gusto_user_set_from_arg(&sim.user, argv[n]);
   }
+
+
+  if (restarted_run) {
+
+    /* put restart code here */
+
+  }
+
+  else {
+
+    sim.status.time_last_checkpoint = -sim.user.cpi;
+    sim.status.checkpoint_number = -1;
+
+  }
+
 
 
   gusto_user_report(&sim.user);
@@ -55,12 +72,16 @@ int main(int argc, char **argv)
 
     void *start_cycle = gusto_start_clock();
 
-    gusto_compute_variables_at_vertices(&sim);
-    gusto_compute_vertex_velocities(&sim);
     gusto_compute_fluxes(&sim);
     gusto_transmit_fluxes(&sim, dt);
-    gusto_mesh_advance_vertices(&sim, dt);
-    gusto_mesh_compute_geometry(&sim);
+
+    if (sim.user.move_cells) {
+      gusto_compute_variables_at_vertices(&sim);
+      gusto_compute_vertex_velocities(&sim);
+      gusto_mesh_advance_vertices(&sim, dt);
+      gusto_mesh_compute_geometry(&sim);
+    }
+
     gusto_recover_variables(&sim);
     gusto_enforce_boundary_condition(&sim);
 
@@ -80,6 +101,7 @@ int main(int argc, char **argv)
     sim.status.iteration += 1;
   }
 
+  gusto_write_checkpoint(&sim, "chkpt.final.h5");
   gusto_free(&sim);
   return 0;
 }
