@@ -15,39 +15,6 @@ void gusto_free(struct gusto_sim *sim)
  * Main function
  * =====================================================================
  */
-int main1(int argc, char **argv)
-{
-  struct gusto_sim sim;
-
-  gusto_user_set_defaults(&sim.user);
-  gusto_status_set_defaults(&sim.status);
-
-
-  for (int n=1; n<argc; ++n) {
-    gusto_user_set_from_arg(&sim.user, argv[n]);
-  }
-
-
-  gusto_user_report(&sim.user);
-  gusto_mesh_generate_verts(&sim);
-  gusto_mesh_generate_cells(&sim);
-  gusto_mesh_generate_faces(&sim);
-  gusto_mesh_report(&sim);
-  gusto_mesh_compute_geometry(&sim);
-  gusto_write_checkpoint(&sim, NULL);
-
-  gusto_free(&sim);
-
-  return 0;
-}
-
-
-
-
-/*
- * Main function
- * =====================================================================
- */
 int main(int argc, char **argv)
 {
   struct gusto_sim sim;

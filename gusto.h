@@ -36,6 +36,7 @@ struct mesh_vert
   double v[4];
   int row_index;
   int col_index;
+  int num_cells;
   struct aux_variables aux[4];
   struct mesh_cell *cell;
   struct mesh_vert *next;
