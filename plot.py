@@ -25,14 +25,37 @@ def plot_1d(filename):
 
 
 
+def triangle_variable_plot(filename):
+    dset = gusto_dataset.GustoDataset(filename)
+    x = dset.get_cell_variable('x1')
+    z = dset.get_cell_variable('x3')
+    f = dset.get_cell_variable('dg')
+    plt.tripcolor(x, z, f)
+    plt.axis('equal')
+
+
+def triangle_mesh_plot(filename):
+    dset = gusto_dataset.GustoDataset(filename)
+    x = dset.get_cell_variable('x1')
+    z = dset.get_cell_variable('x3')
+    plt.triplot(x, z)
+    plt.axis('equal')
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument('command')
     parser.add_argument('filenames', nargs='+')
+
     args = parser.parse_args()
+
+    plots = {'trimesh': triangle_mesh_plot,
+             'triplot': triangle_variable_plot}
 
     #plot_faces(args.filenames[0])
 
-    for filename in args.filenames:
-        plot_1d(filename)
+    #for filename in args.filenames:
+    #    plot_1d(filename)
 
+    plots[args.command](args.filenames[0])
     plt.show()

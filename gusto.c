@@ -4,9 +4,22 @@
 #include "gusto.h"
 
 
+void gusto_init(struct gusto_sim *sim)
+{
+  sim->num_rows = 0;
+  sim->smallest_cell_length = 0.0;
+
+  sim->faces = NULL;
+  sim->rows = NULL;
+
+  gusto_user_set_defaults(&sim->user);
+  gusto_status_set_defaults(&sim->status);
+}
+
+
 void gusto_free(struct gusto_sim *sim)
 {
-  gusto_mesh_clear(sim);
+  gusto_mesh_clear(sim, 'a');
 }
 
 
@@ -20,9 +33,7 @@ int main(int argc, char **argv)
   struct gusto_sim sim;
   int restarted_run = 0;
 
-  gusto_user_set_defaults(&sim.user);
-  gusto_status_set_defaults(&sim.status);
-
+  gusto_init(&sim);
 
   for (int n=1; n<argc; ++n) {
     gusto_user_set_from_arg(&sim.user, argv[n]);
@@ -52,10 +63,10 @@ int main(int argc, char **argv)
   gusto_initial_data(&sim);
 
 
-  double dt = 0.25 * sim.smallest_cell_length;
-  sim.status.time_step = dt;
-
   while (sim.status.time_simulation < sim.user.tmax) {
+
+    double dt = 0.25 * sim.smallest_cell_length;
+    sim.status.time_step = dt;
 
     /*
      * Write a checkpoint if it's time
@@ -79,6 +90,7 @@ int main(int argc, char **argv)
       gusto_compute_variables_at_vertices(&sim);
       gusto_compute_vertex_velocities(&sim);
       gusto_mesh_advance_vertices(&sim, dt);
+      gusto_mesh_generate_faces(&sim);
       gusto_mesh_compute_geometry(&sim);
     }
 

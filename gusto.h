@@ -14,10 +14,10 @@ struct gusto_sim
 {
   int num_rows;
   double smallest_cell_length; /* for CFL condition */
-  struct gusto_user user;
-  struct gusto_status status;
   struct mesh_face *faces;
   struct mesh_row *rows;
+  struct gusto_user user;
+  struct gusto_status status;
 } ;
 
 struct aux_variables
@@ -36,7 +36,6 @@ struct mesh_vert
   double v[4];
   int row_index;
   int col_index;
-  int num_cells;
   struct aux_variables aux[4];
   struct mesh_cell *cell;
   struct mesh_vert *next;
@@ -86,7 +85,7 @@ double gusto_stop_clock(void *clock_s);
 /* Mesh operations */
 int gusto_mesh_count(struct gusto_sim *sim, char which, int n);
 void gusto_mesh_report(struct gusto_sim *sim);
-void gusto_mesh_clear(struct gusto_sim *sim);
+void gusto_mesh_clear(struct gusto_sim *sim, char which);
 void gusto_mesh_generate_verts(struct gusto_sim *sim);
 void gusto_mesh_generate_cells(struct gusto_sim *sim);
 void gusto_mesh_generate_faces(struct gusto_sim *sim);

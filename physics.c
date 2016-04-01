@@ -17,7 +17,7 @@ void initial_data_cylindrical_shock(struct aux_variables *A, double *X)
   }
   else {
     A->comoving_mass_density = 0.1;
-    A->gas_pressure = 1.0;
+    A->gas_pressure = 0.125;
   }
 }
 
@@ -80,7 +80,8 @@ void gusto_initial_data(struct gusto_sim *sim)
       A->magnetic_four_vector[2] = 0.0;
       A->magnetic_four_vector[3] = 0.0;
 
-      initial_data_density_wave(A, C->x);
+      //initial_data_density_wave(A, C->x);
+      initial_data_cylindrical_shock(A, C->x);
 
       gusto_vars_complete_aux(A);
       gusto_vars_to_conserved(A, C->U, C->dA);
@@ -185,42 +186,28 @@ void gusto_compute_variables_at_vertices(struct gusto_sim *sim)
   struct mesh_vert *V;
   struct mesh_cell *C;
 
-  for (int n=0; n<sim->num_rows; ++n) {
-    DL_FOREACH(sim->rows[n].verts, V) {
-      for (int d=1; d<4; ++d) {
-	V->aux[0].velocity_four_vector[d] = 0.0;
-	V->aux[0].magnetic_four_vector[d] = 0.0;
-      }
-      V->aux[0].comoving_mass_density = 0.0;
-      V->aux[0].gas_pressure = 0.0;
-      V->num_cells = 0;
-    }
-  }
+  /* IMPROVE: This function needs some work. Presently it sets the velocity of
+     any vertex twice (except for the first and last of the row). It also would
+     allow, formally, for two vertices at the same location to move in different
+     directions. */
 
   for (int n=0; n<sim->num_rows; ++n) {
     DL_FOREACH(sim->rows[n].cells, C) {
+
       for (int v=0; v<4; ++v) {
 	struct aux_variables *A = &C->verts[v]->aux[0];
-	C->verts[v]->num_cells += 1;
+
 	for (int d=1; d<4; ++d) {
-	  A->velocity_four_vector[d] += C->aux[0].velocity_four_vector[d];
-	  A->magnetic_four_vector[d] += C->aux[0].magnetic_four_vector[d];
+	  A->velocity_four_vector[d] = C->aux[0].velocity_four_vector[d];
+	  A->magnetic_four_vector[d] = C->aux[0].magnetic_four_vector[d];
 	}
-	A->comoving_mass_density += C->aux[0].comoving_mass_density;
-	A->gas_pressure += C->aux[0].gas_pressure;
+
+	A->comoving_mass_density = C->aux[0].comoving_mass_density;
+	A->gas_pressure = C->aux[0].gas_pressure;
       }
     }
-  }
 
-  for (int n=0; n<sim->num_rows; ++n) {
     DL_FOREACH(sim->rows[n].verts, V) {
-      int N = V->num_cells;
-      for (int d=1; d<4; ++d) {
-	V->aux[0].velocity_four_vector[d] /= N;
-	V->aux[0].magnetic_four_vector[d] /= N;
-      }
-      V->aux[0].comoving_mass_density /= N;
-      V->aux[0].gas_pressure /= N;
       gusto_vars_complete_aux(&V->aux[0]);
     }
   }

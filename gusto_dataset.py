@@ -22,12 +22,25 @@ class GustoDataset(object):
             verts.append(coords)
         return verts
 
-    def get_cell_variable(self, key):
+    def get_cell_variable(self, key, flat=True):
         cells = [ ]
         for row in self.h5f['rows']:
             var = self.h5f['rows'][row]['cells'][key][:]
             cells.append(var)
-        return cells
+        if cells:
+            return np.array(cells).flatten()
+        else:
+            return cells
+
+    def get_vert_variable(self, key, flat=True):
+        verts = [ ]
+        for row in self.h5f['rows']:
+            var = self.h5f['rows'][row]['verts'][key][:]
+            verts.append(var)
+        if flat:
+            return np.array(verts).flatten()
+        else:
+            return verts
 
     def get_face_segments(self):
         verts = self.get_vertex_positions()

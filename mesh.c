@@ -16,30 +16,38 @@ void gusto_mesh_report(struct gusto_sim *sim)
 
 
 
-void gusto_mesh_clear(struct gusto_sim *sim)
+void gusto_mesh_clear(struct gusto_sim *sim, char which)
 {
   struct mesh_vert *V0, *V1;
   struct mesh_cell *C0, *C1;
   struct mesh_face *F0, *F1;
 
   for (int n=0; n<sim->num_rows; ++n) {
-    DL_FOREACH_SAFE(sim->rows[n].verts, V0, V1) {
-      DL_DELETE(sim->rows[n].verts, V0);
-      free(V0);
+    if (which == 'v' || which == 'a') {
+      DL_FOREACH_SAFE(sim->rows[n].verts, V0, V1) {
+	DL_DELETE(sim->rows[n].verts, V0);
+	free(V0);
+      }
     }
-    DL_FOREACH_SAFE(sim->rows[n].cells, C0, C1) {
-      DL_DELETE(sim->rows[n].cells, C0);
-      free(C0);
+    if (which == 'c' || which == 'a') {
+      DL_FOREACH_SAFE(sim->rows[n].cells, C0, C1) {
+	DL_DELETE(sim->rows[n].cells, C0);
+	free(C0);
+      }
     }
   }
 
-  DL_FOREACH_SAFE(sim->faces, F0, F1) {
-    DL_DELETE(sim->faces, F0);
-    free(F0);
+  if (which == 'f' || which == 'a') {
+    DL_FOREACH_SAFE(sim->faces, F0, F1) {
+      DL_DELETE(sim->faces, F0);
+      free(F0);
+    }
   }
 
-  free(sim->rows);
-  sim->num_rows = 0;
+  if (which == 'v' || which == 'a') {
+    free(sim->rows);
+    sim->num_rows = 0;
+  }
 }
 
 
@@ -142,8 +150,8 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
       VR->x[1] = R0 + (n_real + 1) * dR;
       VL->x[2] = 0.0;
       VR->x[2] = 0.0;
-      VL->x[3] = z0 + i_real * dz + 0.0 * dz * (n % 2 == 0);
-      VR->x[3] = z0 + i_real * dz + 0.0 * dz * (n % 2 == 0);
+      VL->x[3] = z0 + i_real * dz + 0.5 * dz * (n % 2 == 0);
+      VR->x[3] = z0 + i_real * dz + 0.5 * dz * (n % 2 == 0);
 
       VL->x[1] += 0.0 * ((double) rand() / RAND_MAX - 0.5);
       VL->x[3] += 0.0 * ((double) rand() / RAND_MAX - 0.5);
@@ -193,7 +201,7 @@ void gusto_mesh_generate_faces(struct gusto_sim *sim)
   struct mesh_cell *CL, *CR;
   struct mesh_face *F;
 
-  sim->faces = NULL;
+  gusto_mesh_clear(sim, 'f');
 
   for (int n=0; n<sim->num_rows; ++n) {
 
@@ -300,14 +308,13 @@ void gusto_mesh_generate_faces(struct gusto_sim *sim)
       DL_APPEND(sim->faces, F);
       F->verts[0] = V0;
       F->verts[1] = V1;
-      F->cells[0] = Cm;
-      F->cells[1] = Cp;
+      F->cells[0] = Cp;
+      F->cells[1] = Cm;
       V0 = V1;
 
       /* Now we advance the cell on the side of the vertex that advanced. The
-	 first face always borders only one cell, thus on the first one or more
-	 iterations, either Cm or Cp is NULL. Similarly, on the last one or more
-	 iterations either Cm or Cp may be NULL.
+	 first and last faces always border only one cell, so on the first and
+	 last iteration(s), either Cm or Cp is NULL.
 	 */
 
       if (which == 'm') {
