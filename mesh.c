@@ -83,6 +83,42 @@ int gusto_mesh_count(struct gusto_sim *sim, char which, int n)
 }
 
 
+void vert_pos_staggered_cartesian(struct gusto_sim *sim, struct mesh_vert *V,
+				  int n, int i, int NR, int Nz)
+{
+  double R0 = sim->user.domain[0];
+  double R1 = sim->user.domain[1];
+  double z0 = sim->user.domain[2];
+  double z1 = sim->user.domain[3];
+  double dR = (R1 - R0) / NR;
+  double dz = (z1 - z0) / Nz;
+
+  V->x[0] = 0.0;
+  V->x[1] = R0 + n * dR;
+  V->x[2] = 0.0;
+  V->x[3] = z0 + i * dz + 0.5 * dz * (n % 2 == 0);
+}
+
+
+void vert_pos_radial(struct gusto_sim *sim, struct mesh_vert *V,
+		     int n, int i, int Nt, int Nr)
+{
+  double r0 = sim->user.domain[0];
+  double r1 = sim->user.domain[1];
+  double t0 = sim->user.domain[2];
+  double t1 = sim->user.domain[3];
+  double dr = log(r1/r0) / Nr;
+  double dt = (t1 - t0) / Nt;
+
+  double r = r0 * exp(i * dr);
+  double t = t0 + dt * n;
+
+  V->x[0] = 0.0;
+  V->x[1] = r * sin(t);
+  V->x[2] = 0.0;
+  V->x[3] = r * cos(t);
+}
+
 
 void gusto_mesh_generate_verts(struct gusto_sim *sim)
 {
@@ -90,12 +126,8 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
   sim->rows = (struct mesh_row *) malloc(sim->num_rows*sizeof(struct mesh_row));
 
   int row_size = sim->user.N[0];
-  int ngR = 0; /* number of ghost cells in the R direction */
-  int ngz = 0; /* number of ghost cells in the z direction */
-  double R0 = 0.0;
-  double R1 = 1.0;
-  double z0 = 0.0;
-  double z1 = 1.0;
+  int ngR = sim->user.ng[0]; /* number of ghost cells in the R direction */
+  int ngz = sim->user.ng[1]; /* number of ghost cells in the z direction */
 
   for (int n=0; n<sim->num_rows; ++n) {
 
@@ -121,6 +153,7 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
      *  x----> R
      *
      */
+
     sim->rows[n].verts = NULL;
     sim->rows[n].cells = NULL;
 
@@ -129,12 +162,10 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
      * ---------------------------------------------------------------------- */
     for (int i=0; i<row_size+ngz+1; ++i) {
 
-      int num_interior_R = sim->num_rows - 2 * ngR;
-      int num_interior_z = row_size      - 2 * ngz;
+      int NR = sim->num_rows - 2 * ngR; /* number of interior R cells */
+      int Nz = row_size      - 2 * ngz; /* number of interior z cells */
       int n_real = n - ngR;
       int i_real = i - ngz;
-      double dR = (R1 - R0) / num_interior_R;
-      double dz = (z1 - z0) / num_interior_z;
 
       VL = (struct mesh_vert *) malloc(sizeof(struct mesh_vert));
       VR = (struct mesh_vert *) malloc(sizeof(struct mesh_vert));
@@ -144,17 +175,8 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
       VL->col_index = 2*i + 0;
       VR->col_index = 2*i + 1;
 
-      VL->x[0] = 0.0;
-      VR->x[0] = 0.0;
-      VL->x[1] = R0 + (n_real + 0) * dR;
-      VR->x[1] = R0 + (n_real + 1) * dR;
-      VL->x[2] = 0.0;
-      VR->x[2] = 0.0;
-      VL->x[3] = z0 + i_real * dz + 0.5 * dz * (n % 2 == 0);
-      VR->x[3] = z0 + i_real * dz + 0.5 * dz * (n % 2 == 0);
-
-      VL->x[1] += 0.0 * ((double) rand() / RAND_MAX - 0.5);
-      VL->x[3] += 0.0 * ((double) rand() / RAND_MAX - 0.5);
+      vert_pos_radial(sim, VL, n_real+0, i_real, NR, Nz);
+      vert_pos_radial(sim, VR, n_real+1, i_real, NR, Nz);
 
       for (int d=0; d<4; ++d) { /* vertex velocities */
 	VL->v[d] = 0.0;
@@ -308,7 +330,7 @@ void gusto_mesh_generate_faces(struct gusto_sim *sim)
       DL_APPEND(sim->faces, F);
       F->verts[0] = V0;
       F->verts[1] = V1;
-      F->cells[0] = Cp;
+      F->cells[0] = Cp; /* Ensures that nhat points from Cm -> Cp */
       F->cells[1] = Cm;
       V0 = V1;
 

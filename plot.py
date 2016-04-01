@@ -50,7 +50,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     plots = {'trimesh': triangle_mesh_plot,
-             'triplot': triangle_variable_plot}
+             'triplot': triangle_variable_plot,
+             'faces': plot_faces}
 
     #plot_faces(args.filenames[0])
 
