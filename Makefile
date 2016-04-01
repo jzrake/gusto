@@ -7,24 +7,19 @@ MAKEFILE_IN = $(PWD)/Makefile.in.template
 endif
 include $(MAKEFILE_IN)
 
-
-
 ifeq ($(HAVE_HDF5), 1)
 HDF5_I = -I$(HDF5_HOME)/include
 HDF5_L = -L$(HDF5_HOME)/lib -lhdf5
 endif
 
-
-SRC = gusto.c ser.c quartic.c srmhd_c2p.c chkpt.c utils.c
+SRC = gusto.c mesh.c ser.c quartic.c srmhd_c2p.c chkpt.c utils.c physics.c
 OBJ = $(SRC:.c=.o)
 APP = gusto
 HEADERS = gusto.h
 
-
 default : $(APP)
 
-
-ser.c : ser.h
+gusto.h : ser.h
 
 %.c : %.jin.c build.py
 	$(JINJA2) > $@
@@ -35,10 +30,8 @@ ser.c : ser.h
 %.o : %.c $(HEADERS)
 	$(CC) $(CFLAGS) $< $(HDF5_I) -c
 
-$(APP) : $(OBJ) $(COW_LIB)
-	$(CC) $(CFLAGS) $^ $(HDF5_L) $(FFTW_L) $(RNPL_L) $(CLIBS) -o $@
+$(APP) : $(OBJ)
+	$(CC) $(CFLAGS) $^ $(HDF5_L) $(CLIBS) -o $@
 
 clean :
 	$(RM) $(APP) $(OBJ)
-
-.FORCE :

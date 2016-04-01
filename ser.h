@@ -6,21 +6,8 @@ struct gusto_user {
     char outdir[256];
     double tmax;
     double cpi;
-    int N[3];
-    int k2;
-    double abc[3];
-    double helicity;
-    double pert;
-    double cfl;
-    double eps;
-    double nu;
-    int measure_cadence;
-    int analyze_cadence;
-    int slice_cadence;
-    int num_pspec_bin;
-    int max_pspec_bin;
-    int calc_initial_diff;
-    int normalize_initial;
+    int N[2];
+    int move_cells;
 };
 
 
@@ -31,14 +18,6 @@ struct gusto_status {
     double time_step;
     double time_last_checkpoint;
     double kzps;
-    double velocity_energy;
-    double magnetic_energy;
-    double velocity_monopole;
-    double magnetic_monopole;
-    double velocity_helicity;
-    double magnetic_helicity;
-    double velocity_L2;
-    double magnetic_L2;
 };
 
 

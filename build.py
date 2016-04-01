@@ -10,21 +10,8 @@ user_struct = [
     ('outdir', 'char[256]', '.'),
     ('tmax', 'double', 1.0),
     ('cpi', 'double', 1.0),
-    ('N', 'int[3]', [128, 128, 1]),
-    ('k2', 'int', 1),
-    ('abc', 'double[3]', [1, 1, 0]),
-    ('helicity', 'double', 1),
-    ('pert', 'double', 0.0),
-    ('cfl', 'double', 0.15),
-    ('eps', 'double', 0.0),
-    ('nu', 'double', 1e-3),
-    ('measure_cadence', 'int', 1),
-    ('analyze_cadence', 'int', 128),
-    ('slice_cadence', 'int', 0),
-    ('num_pspec_bin', 'int', 256),
-    ('max_pspec_bin', 'int', 1024),
-    ('calc_initial_diff', 'int', 1),
-    ('normalize_initial', 'int', 0),
+    ('N', 'int[2]', [128, 1]),
+    ('move_cells', 'int', 1),
 ]
 
 
@@ -35,14 +22,6 @@ status_struct = [
     ('time_step', 'double', 0.0),
     ('time_last_checkpoint', 'double', 0.0),
     ('kzps', 'double', 0.0),
-    ('velocity_energy', 'double', 0.0),
-    ('magnetic_energy', 'double', 0.0),
-    ('velocity_monopole', 'double', 0.0),
-    ('magnetic_monopole', 'double', 0.0),
-    ('velocity_helicity', 'double', 0.0),
-    ('magnetic_helicity', 'double', 0.0),
-    ('velocity_L2', 'double', 0.0),
-    ('magnetic_L2', 'double', 0.0),
 ]
 
 
