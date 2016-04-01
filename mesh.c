@@ -83,8 +83,9 @@ int gusto_mesh_count(struct gusto_sim *sim, char which, int n)
 }
 
 
+
 void vert_pos_staggered_cartesian(struct gusto_sim *sim, struct mesh_vert *V,
-				  int n, int i, int NR, int Nz)
+				  int n, int i, int NR, int Nz, char pm)
 {
   double R0 = sim->user.domain[0];
   double R1 = sim->user.domain[1];
@@ -96,12 +97,13 @@ void vert_pos_staggered_cartesian(struct gusto_sim *sim, struct mesh_vert *V,
   V->x[0] = 0.0;
   V->x[1] = R0 + n * dR;
   V->x[2] = 0.0;
-  V->x[3] = z0 + i * dz + 0.5 * dz * (n % 2 == 0);
+  V->x[3] = z0 + i * dz + 0.5 * dz * pm;
 }
 
 
+
 void vert_pos_radial(struct gusto_sim *sim, struct mesh_vert *V,
-		     int n, int i, int Nt, int Nr)
+		     int n, int i, int Nt, int Nr, char pm)
 {
   double r0 = sim->user.domain[0];
   double r1 = sim->user.domain[1];
@@ -118,6 +120,7 @@ void vert_pos_radial(struct gusto_sim *sim, struct mesh_vert *V,
   V->x[2] = 0.0;
   V->x[3] = r * cos(t);
 }
+
 
 
 void gusto_mesh_generate_verts(struct gusto_sim *sim)
@@ -175,8 +178,11 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
       VL->col_index = 2*i + 0;
       VR->col_index = 2*i + 1;
 
-      vert_pos_radial(sim, VL, n_real+0, i_real, NR, Nz);
-      vert_pos_radial(sim, VR, n_real+1, i_real, NR, Nz);
+      //vert_pos_radial(sim, VL, n_real+0, i_real, NR, Nz);
+      //vert_pos_radial(sim, VR, n_real+1, i_real, NR, Nz);
+
+      vert_pos_staggered_cartesian(sim, VL, n_real+0, i_real, NR, Nz, n_real%2);
+      vert_pos_staggered_cartesian(sim, VR, n_real+1, i_real, NR, Nz, n_real%2);
 
       for (int d=0; d<4; ++d) { /* vertex velocities */
 	VL->v[d] = 0.0;
