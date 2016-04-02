@@ -146,7 +146,7 @@ void gusto_add_source_terms(struct gusto_sim *sim, double dt)
       if (sim->user.coordinates == 'p') {
 	gusto_cylindrical_source_terms(&C->aux[0], Udot);
 	for (int q=0; q<8; ++q) {
-	  C->U[q] -= Udot[q] * C->dA[0] * dt; /* why is this negative? */
+	  C->U[q] += Udot[q] * C->dA[0] * dt;
 	}
       }
     }

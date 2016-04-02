@@ -333,11 +333,20 @@ void gusto_mesh_generate_faces(struct gusto_sim *sim)
       }
 
       F = (struct mesh_face *) malloc(sizeof(struct mesh_face));
-      DL_APPEND(sim->faces, F);
       F->verts[0] = V0;
       F->verts[1] = V1;
       F->cells[0] = Cp; /* Ensures that nhat points from Cm -> Cp */
       F->cells[1] = Cm;
+
+      double dx[4] = VEC4_SUB(V1->x, V0->x);
+
+      if (VEC4_MOD(dx) > 1e-12) { /* So we don't create faces with zero area */
+	DL_APPEND(sim->faces, F);
+      }
+      else {
+	free(F);
+      }
+
       V0 = V1;
 
       /* Now we advance the cell on the side of the vertex that advanced. The
@@ -446,7 +455,7 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
   DL_FOREACH(sim->faces, F) {
     double df[4] = {0, 0, 1, 0};
     double dl[4] = VEC4_SUB(F->verts[1]->x, F->verts[0]->x);
-    double dA[4] = VEC4_CROSS(dl, df);
+    double dA[4] = VEC4_CROSS(df, dl);
     F->nhat[0] = VEC4_MOD(dA);
     F->nhat[1] = dA[1] / F->nhat[0];
     F->nhat[2] = dA[2] / F->nhat[0];
@@ -454,6 +463,18 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
 
     if (sim->user.coordinates == 'p') {
       F->nhat[0] *= 0.5 * (F->verts[0]->x[1] + F->verts[1]->x[2]);
+    }
+
+    /* This is a self-consistency check. It should be guarenteed by the face
+       construction scheme that nhat points from cells[0] -> cells[1]. */
+
+    if (F->cells[0] && F->cells[1]) {
+      double dL[4] = VEC4_SUB(F->cells[1]->x, F->cells[0]->x);
+      double aligned = VEC4_DOT(dL, F->nhat);
+
+      if (aligned < 0) {
+	printf("[gusto] ERROR: a face is on backwards\n");
+      }
     }
   }
 }
