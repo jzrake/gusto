@@ -146,9 +146,8 @@ void gusto_add_source_terms(struct gusto_sim *sim, double dt)
       if (sim->user.coordinates == 'p') {
 	gusto_cylindrical_source_terms(&C->aux[0], Udot);
 	for (int q=0; q<8; ++q) {
-	  C->U[q] += Udot[q] * C->dA[0] * dt;
+	  C->U[q] -= Udot[q] * C->dA[0] * dt; /* why is this negative? */
 	}
-	//printf("adding source %f %f\n", Udot[2], C->U[2]);
       }
     }
   }
@@ -481,7 +480,6 @@ void gusto_cylindrical_source_terms(struct aux_variables *A, double Udot[8])
   double pg = A->gas_pressure;
   double pb = A->magnetic_pressure;
   double H0 = A->enthalpy_density;
-
   Udot[S11] = (pg + pb + u[3]*u[3]*H0 - b[3]*b[3]) / A->R;
 }
 

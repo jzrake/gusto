@@ -416,6 +416,7 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
       C->dA[3] = 0.50 * (VEC4_MOD(dAz0) + VEC4_MOD(dAz1));
 
       if (sim->user.coordinates == 'p') {
+	C->dA[1] = C->dA[1] * C->x[1]; /* multiply by cylindrical radius */
 	C->dA[0] = C->dA[2] * C->x[1]; /* area is per steradian */
       }
       else {
@@ -450,6 +451,10 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
     F->nhat[1] = dA[1] / F->nhat[0];
     F->nhat[2] = dA[2] / F->nhat[0];
     F->nhat[3] = dA[3] / F->nhat[0];
+
+    if (sim->user.coordinates == 'p') {
+      F->nhat[0] *= 0.5 * (F->verts[0]->x[1] + F->verts[1]->x[2]);
+    }
   }
 }
 
