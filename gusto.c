@@ -23,6 +23,13 @@ void gusto_free(struct gusto_sim *sim)
 }
 
 
+void gusto_config_from_user(struct gusto_sim *sim)
+{
+  sim->boundary_con = NULL;
+  sim->initial_data = gusto_lookup_initial_data(sim->user.initial_data);
+}
+
+
 
 /*
  * Main function
@@ -30,9 +37,9 @@ void gusto_free(struct gusto_sim *sim)
  */
 int main(int argc, char **argv)
 {
-  struct gusto_sim sim;
   int restarted_run = 0;
 
+  struct gusto_sim sim;
   gusto_init(&sim);
 
   for (int n=1; n<argc; ++n) {
@@ -54,8 +61,8 @@ int main(int argc, char **argv)
   }
 
 
-
   gusto_user_report(&sim.user);
+  gusto_config_from_user(&sim);
   gusto_mesh_generate_verts(&sim);
   gusto_mesh_generate_cells(&sim);
   gusto_mesh_generate_faces(&sim);

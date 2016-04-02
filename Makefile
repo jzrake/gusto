@@ -15,7 +15,7 @@ endif
 SRC = gusto.c mesh.c ser.c quartic.c srmhd_c2p.c chkpt.c utils.c physics.c
 OBJ = $(SRC:.c=.o)
 APP = gusto
-HEADERS = gusto.h
+HEADERS = gusto.h ser.h
 
 default : $(APP)
 

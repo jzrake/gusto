@@ -9,6 +9,14 @@
  * Data structures
  * =====================================================================
  */
+struct aux_variables;
+struct gusto_sim;
+struct mesh_vert;
+struct mesh_face;
+struct mesh_cell;
+
+typedef void (*OpInitialData)(struct aux_variables *A, double *X);
+typedef void (*OpBoundaryCon)(struct aux_variables *A, double *X);
 
 struct gusto_sim
 {
@@ -18,6 +26,8 @@ struct gusto_sim
   struct mesh_row *rows;
   struct gusto_user user;
   struct gusto_status status;
+  OpInitialData initial_data;
+  OpBoundaryCon boundary_con;
 } ;
 
 struct aux_variables
@@ -123,8 +133,13 @@ void gusto_transmit_fluxes(struct gusto_sim *sim, double dt);
 void gusto_add_source_terms(struct gusto_sim *sim, double dt);
 
 
+void gusto_init(struct gusto_sim *sim);
 void gusto_free(struct gusto_sim *sim);
+void gusto_config_from_user(struct gusto_sim *sim);
 void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname);
+
+
+OpInitialData gusto_lookup_initial_data(const char *key);
 
 
 /*
@@ -150,6 +165,7 @@ void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname);
 
 #define VEC4_SUB(x,y) {0,x[1]-y[1],x[2]-y[2],x[3]-y[3]}
 #define VEC4_ADD(x,y) {0,x[1]+y[1],x[2]+y[2],x[3]+y[3]}
+#define VEC4_AVG(x,y) {0,0.5*(x[1]+y[1]),0.5*(x[2]+y[2]),0.5*(x[3]+y[3])}
 #define VEC4_DOT(x,y) (x[1]*y[1]+x[2]*y[2]+x[3]*y[3])
 #define VEC4_MOD(x) sqrt(VEC4_DOT(x,x))
 #define VEC4_CROSS(x,y) {0,			\
@@ -163,6 +179,7 @@ void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname);
     x[3] /= norm;						\
   } while (0)
 
+#define VEC4_SUB2(x,y,z) z[0]=0;z[1]=x[1]-y[1];z[2]=x[2]-y[2];z[3]=x[3]-y[3];
 
 
 #endif /* GUSTO_HEADER */

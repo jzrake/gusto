@@ -95,9 +95,9 @@ void vert_pos_staggered_cartesian(struct gusto_sim *sim, struct mesh_vert *V,
   double dz = (z1 - z0) / Nz;
 
   V->x[0] = 0.0;
-  V->x[1] = R0 + n * dR;
+  V->x[1] = R0 + (n + (pm == 'p')) * dR;
   V->x[2] = 0.0;
-  V->x[3] = z0 + i * dz + 0.5 * dz * pm;
+  V->x[3] = z0 + i * dz + 0.5 * dz * (n % 2 == 0);
 }
 
 
@@ -109,12 +109,13 @@ void vert_pos_radial(struct gusto_sim *sim, struct mesh_vert *V,
   double r1 = sim->user.domain[1];
   double t0 = sim->user.domain[2];
   double t1 = sim->user.domain[3];
-  double dr = log(r1/r0) / Nr;
+  double dr = log(r1 / r0) / Nr;
   double dt = (t1 - t0) / Nt;
 
-  double r = r0 * exp(i * dr);
-  double t = t0 + dt * n;
+  double r = r0 * exp(i * dr + 0.5 * dr * (n % 2 == 0));
+  double t = t0 + dt * (n + (pm == 'p'));
 
+  /* Theta is measured from the equatorial plane, not the pole. */
   V->x[0] = 0.0;
   V->x[1] = r * cos(t);
   V->x[2] = 0.0;
@@ -178,11 +179,11 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
       VL->col_index = 2*i + 0;
       VR->col_index = 2*i + 1;
 
-      vert_pos_radial(sim, VL, n_real+0, i_real, NR, Nz, 0);
-      vert_pos_radial(sim, VR, n_real+1, i_real, NR, Nz, 0);
+      vert_pos_radial(sim, VL, n_real, i_real, NR, Nz, 'm');
+      vert_pos_radial(sim, VR, n_real, i_real, NR, Nz, 'p');
 
-      /* vert_pos_staggered_cartesian(sim, VL, n_real+0, i_real, NR, Nz, n_real%2); */
-      /* vert_pos_staggered_cartesian(sim, VR, n_real+1, i_real, NR, Nz, n_real%2); */
+      /* vert_pos_staggered_cartesian(sim, VL, n_real, i_real, NR, Nz, 'm'); */
+      /* vert_pos_staggered_cartesian(sim, VR, n_real, i_real, NR, Nz, 'p'); */
 
       for (int d=0; d<4; ++d) { /* vertex velocities */
 	VL->v[d] = 0.0;
@@ -239,7 +240,7 @@ void gusto_mesh_generate_faces(struct gusto_sim *sim)
     CR = sim->rows[n].cells;
 
     /* ----------------------------------------------------------------------
-     * Add the faces, one for each z coordinate (pair of vertices).
+     * Add longitudinal faces, one for each pair of vertices along a row.
      * ---------------------------------------------------------------------- */
     while (1) {
 
@@ -264,6 +265,9 @@ void gusto_mesh_generate_faces(struct gusto_sim *sim)
   }
 
 
+  /* ----------------------------------------------------------------------
+   * Add lateral faces.
+   * ---------------------------------------------------------------------- */
   for (int n=0; n<sim->num_rows-1; ++n) {
 
     struct mesh_vert *V0, *V1;
@@ -276,7 +280,12 @@ void gusto_mesh_generate_faces(struct gusto_sim *sim)
     Cm = NULL;
     Cp = NULL;
 
-    if (Vm->x[3] < Vp->x[3]) {
+    /* vector pointing along the local longitudinal axis */
+    double dl[4] = VEC4_SUB(Vp->next->next->x, Vp->x);
+    double lm = VEC4_DOT(Vm->x, dl);
+    double lp = VEC4_DOT(Vp->x, dl);
+
+    if (lm < lp) {
       V0 = Vm;
       Vm = Vm->next->next;
       Cm = sim->rows[n+0].cells;
@@ -295,25 +304,35 @@ void gusto_mesh_generate_faces(struct gusto_sim *sim)
      * We start with a face F that is attached at its lower end to the vertex
      * V0. There are two possible vertices to which F might be attached at the
      * other end - Vm and Vp, which are on the left and right of the bounding
-     * surface respectively. The correct one is whichever has the smaller z
+     * surface respectively. The correct one is whichever has the smaller 'l'
      * coordinate. If that is Vp, then we attach the other end of F to V1 = Vp,
      * and advance Vp to the next vertex along its of the surface. We then add
      * that face to the list, reset V0 = V1, and begin a new face whose lower
      * end point is the new V0. If either Vp or Vm is NULL, then we are out of
      * vertices on that side. In that case, the construction is finished when
      * the next vertex on the remaining side is also NULL.
-     * -------------------------------------------------------------------------
+     *
+     * The 'l' coordinate is the measured along the local longitudinal
+     * axis. That would be the vertex's z coordinate if the rows are along z.
+     *
+     -------------------------------------------------------------------------
      */
 
     while (proceed) {
 
       if (Vm && Vp) {
-	if (Vm->x[3] < Vp->x[3]) {
+
+	double lm = VEC4_DOT(Vm->x, dl);
+	double lp = VEC4_DOT(Vp->x, dl);
+
+	if (lm < lp) {
+	  //printf("m\n");
 	  which = 'm';
 	  V1 = Vm;
 	  Vm = Vm->next ? Vm->next->next : NULL;
 	}
 	else {
+	  //printf("p\n");
 	  which = 'p';
 	  V1 = Vp;
 	  Vp = Vp->next ? Vp->next->next : NULL;
@@ -335,12 +354,12 @@ void gusto_mesh_generate_faces(struct gusto_sim *sim)
       F = (struct mesh_face *) malloc(sizeof(struct mesh_face));
       F->verts[0] = V0;
       F->verts[1] = V1;
-      F->cells[0] = Cp; /* Ensures that nhat points from Cm -> Cp */
-      F->cells[1] = Cm;
+      F->cells[0] = Cm;
+      F->cells[1] = Cp;
 
-      double dx[4] = VEC4_SUB(V1->x, V0->x);
+      VEC4_SUB2(V1->x, V0->x, dl);
 
-      if (VEC4_MOD(dx) > 1e-12) { /* So we don't create faces with zero area */
+      if (VEC4_MOD(dl) > 1e-12) { /* So we don't create faces with zero area */
 	DL_APPEND(sim->faces, F);
       }
       else {
@@ -454,24 +473,48 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
    */
   DL_FOREACH(sim->faces, F) {
     double df[4] = {0, 0, 1, 0};
-    double dl[4] = VEC4_SUB(F->verts[1]->x, F->verts[0]->x);
-    double dA[4] = VEC4_CROSS(df, dl);
+    double dx[4] = VEC4_SUB(F->verts[1]->x, F->verts[0]->x);
+    double x0[4] = VEC4_AVG(F->verts[1]->x, F->verts[0]->x);
+    double dA[4] = VEC4_CROSS(df, dx);
+
     F->nhat[0] = VEC4_MOD(dA);
     F->nhat[1] = dA[1] / F->nhat[0];
     F->nhat[2] = dA[2] / F->nhat[0];
     F->nhat[3] = dA[3] / F->nhat[0];
 
+
+    /* If in cylindrical coordinates then the face area is multiplied by
+       R. There's a bug here: why does dividing by 2 make it work? */
     if (sim->user.coordinates == 'p') {
-      F->nhat[0] *= 0.5 * (F->verts[0]->x[1] + F->verts[1]->x[2]);
+      F->nhat[0] *= 0.5 * x0[1];
     }
 
-    /* This is a self-consistency check. It should be guarenteed by the face
-       construction scheme that nhat points from cells[0] -> cells[1]. */
 
+
+    /* This ensures that the face's normal vector points from cells[0] ->
+       cells[1]. */
+    double dz[4] = {0,0,0,0};
+    if (F->cells[0] && F->cells[1]) {
+      VEC4_SUB2(F->cells[1]->x, F->cells[0]->x, dz);
+    }
+    else if (F->cells[0]) {
+      VEC4_SUB2(x0, F->cells[0]->x, dz);
+    }
+    else if (F->cells[1]) {
+      VEC4_SUB2(F->cells[1]->x, x0, dz);
+    }
+    if (VEC4_DOT(dz, F->nhat) < 0.0) {
+      F->nhat[1] *= -1;
+      F->nhat[2] *= -1;
+      F->nhat[3] *= -1;
+    }
+
+
+    /* This is a self-consistency check. It should be guarenteed by the previous
+       lines. */
     if (F->cells[0] && F->cells[1]) {
       double dL[4] = VEC4_SUB(F->cells[1]->x, F->cells[0]->x);
       double aligned = VEC4_DOT(dL, F->nhat);
-
       if (aligned < 0) {
 	printf("[gusto] ERROR: a face is on backwards\n");
       }

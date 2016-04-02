@@ -2,7 +2,6 @@
 #define GUSTO_SERIAL
 
 struct gusto_user {
-    char problem_name[1024];
     char outdir[256];
     double tmax;
     double cpi;
@@ -11,6 +10,8 @@ struct gusto_user {
     double domain[4];
     char coordinates;
     int move_cells;
+    char initial_data[256];
+    char boundary_con[256];
 };
 
 

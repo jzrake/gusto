@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <math.h>
+#include <string.h>
 #include "utlist.h"
 #include "gusto.h"
 #include "srmhd_c2p.h"
@@ -58,6 +59,33 @@ void initial_data_density_wave(struct aux_variables *A, double *X)
   A->velocity_four_vector[3] = 0.0;
   A->comoving_mass_density = d;
   A->gas_pressure = 1.0;
+}
+
+
+
+OpInitialData gusto_lookup_initial_data(const char *user_key)
+{
+  const char *keys[] = {
+    "cylindrical_shock",
+    NULL
+  } ;
+  OpInitialData vals[] = {
+    initial_data_cylindrical_shock,
+    NULL } ;
+  int n = 0;
+  const char *key;
+  OpInitialData val;
+  do {
+    key = keys[n];
+    val = vals[n];
+    if (strcmp(user_key, key) == 0) {
+      return val;
+    }
+    else {
+      n += 1;
+    }
+  } while (key);
+  return NULL;
 }
 
 

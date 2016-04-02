@@ -6,7 +6,6 @@ from jinja2 import Environment, FileSystemLoader
 THIS_DIR = '.'
 
 user_struct = [
-    ('problem_name', 'char[1024]', 'abc'),
     ('outdir', 'char[256]', '.'),
     ('tmax', 'double', 1.0),
     ('cpi', 'double', 1.0),
@@ -14,7 +13,9 @@ user_struct = [
     ('ng', 'int[2]', [0, 0]),
     ('domain', 'double[4]', [0, 1, 0, 1]),
     ('coordinates', 'char', 'c'),
-    ('move_cells', 'int', 1),
+    ('move_cells', 'int', 0),
+    ('initial_data', 'char[256]', 'density_wave'),
+    ('boundary_con', 'char[256]', ''),
 ]
 
 
