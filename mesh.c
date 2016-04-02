@@ -124,6 +124,25 @@ void vert_pos_radial(struct gusto_sim *sim, struct mesh_vert *V,
 
 
 
+void vert_pos_cylindrical(struct gusto_sim *sim, struct mesh_vert *V,
+			  int n, int i, int Nz, int NR, char pm)
+{
+  double R0 = sim->user.domain[0];
+  double R1 = sim->user.domain[1];
+  double z0 = sim->user.domain[2];
+  double z1 = sim->user.domain[3];
+  double dR = (R1 - R0) / NR;
+  double dz = (z1 - z0) / Nz;
+
+
+  V->x[0] = 0.0;
+  V->x[1] = R0 + i * dR;
+  V->x[2] = 0.0;
+  V->x[3] = z0 + (n + (pm == 'p')) * dz;
+}
+
+
+
 void gusto_mesh_generate_verts(struct gusto_sim *sim)
 {
   sim->num_rows = sim->user.N[1];
@@ -179,11 +198,14 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
       VL->col_index = 2*i + 0;
       VR->col_index = 2*i + 1;
 
-      vert_pos_radial(sim, VL, n_real, i_real, NR, Nz, 'm');
-      vert_pos_radial(sim, VR, n_real, i_real, NR, Nz, 'p');
-
       /* vert_pos_staggered_cartesian(sim, VL, n_real, i_real, NR, Nz, 'm'); */
       /* vert_pos_staggered_cartesian(sim, VR, n_real, i_real, NR, Nz, 'p'); */
+
+      vert_pos_cylindrical(sim, VL, n_real, i_real, NR, Nz, 'm');
+      vert_pos_cylindrical(sim, VR, n_real, i_real, NR, Nz, 'p');
+
+      /* vert_pos_radial(sim, VL, n_real, i_real, NR, Nz, 'm'); */
+      /* vert_pos_radial(sim, VR, n_real, i_real, NR, Nz, 'p'); */
 
       for (int d=0; d<4; ++d) { /* vertex velocities */
 	VL->v[d] = 0.0;
@@ -433,9 +455,9 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
       C->dA[3] = 0.50 * (VEC4_MOD(dAz0) + VEC4_MOD(dAz1));
 
       if (sim->user.coordinates == 'p') {
-	C->dA[0] *= C->x[1];
-	C->dA[1] *= C->x[1];
-	C->dA[3] *= C->x[1];
+	C->dA[0] *= C->x[1] * 2 * M_PI;
+	C->dA[1] *= C->x[1] * 2 * M_PI;
+	C->dA[3] *= C->x[1] * 2 * M_PI;
       }
 
       /* Cell's longitudinal axis */
@@ -474,7 +496,7 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
     /* If in cylindrical coordinates then the face area is multiplied by
        R. There's a bug here: why does dividing by 2 make it work? */
     if (sim->user.coordinates == 'p') {
-      F->nhat[0] *= 0.5 * x0[1];
+      F->nhat[0] *= x0[1] * 2 * M_PI;
     }
 
 
