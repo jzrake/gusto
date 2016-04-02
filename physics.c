@@ -213,7 +213,6 @@ void gusto_compute_vertex_velocities(struct gusto_sim *sim)
 void gusto_enforce_boundary_condition(struct gusto_sim *sim)
 {
   for (int n=0; n<sim->num_rows; ++n) {
-
     struct mesh_cell *Cinner_bc = sim->rows[n].cells;
     struct mesh_cell *Couter_bc = sim->rows[n].cells;
 
@@ -222,11 +221,11 @@ void gusto_enforce_boundary_condition(struct gusto_sim *sim)
     struct mesh_cell *Cinner_in = Cinner_bc->next;
     struct mesh_cell *Couter_in = Couter_bc->prev;
 
-    /* Cinner_bc->aux[0] = Couter_in->aux[0]; */
-    /* Couter_bc->aux[0] = Cinner_in->aux[0]; */
+    Cinner_bc->aux[0] = Couter_in->aux[0];
+    Couter_bc->aux[0] = Cinner_in->aux[0];
 
-    /* gusto_to_conserved(&Cinner_bc->aux[0], Cinner_bc->U, Cinner_bc->dA); */
-    /* gusto_to_conserved(&Couter_bc->aux[0], Couter_bc->U, Couter_bc->dA); */
+    gusto_to_conserved(&Cinner_bc->aux[0], Cinner_bc->U, Cinner_bc->dA);
+    gusto_to_conserved(&Couter_bc->aux[0], Couter_bc->U, Couter_bc->dA);
   }
 }
 

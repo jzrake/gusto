@@ -103,7 +103,7 @@ int main(int argc, char **argv)
     }
 
     gusto_recover_variables(&sim);
-    gusto_enforce_boundary_condition(&sim);
+    //gusto_enforce_boundary_condition(&sim);
 
     double seconds = gusto_stop_clock(start_cycle);
 

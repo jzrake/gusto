@@ -112,7 +112,7 @@ void vert_pos_radial(struct gusto_sim *sim, struct mesh_vert *V,
   double dr = log(r1 / r0) / Nr;
   double dt = (t1 - t0) / Nt;
 
-  double r = r0 * exp(i * dr + 0.5 * dr * (n % 2 == 0));
+  double r = r0 * exp(i * dr);
   double t = t0 + dt * (n + (pm == 'p'));
 
   /* Theta is measured from the equatorial plane, not the pole. */
@@ -419,45 +419,32 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
       double dz0[4] = VEC4_SUB(C->verts[1]->x, C->verts[0]->x);
       double dz1[4] = VEC4_SUB(C->verts[3]->x, C->verts[2]->x);
       double dphi[4] = {0, 0, 1, 0};
-      double dAf0[4] = VEC4_CROSS(dz0, dR0);
-      double dAf1[4] = VEC4_CROSS(dz0, dR1);
-      double dAf2[4] = VEC4_CROSS(dz1, dR0);
-      double dAf3[4] = VEC4_CROSS(dz1, dR1);
       double dAR0[4] = VEC4_CROSS(dphi, dz0);
       double dAR1[4] = VEC4_CROSS(dphi, dz1);
       double dAz0[4] = VEC4_CROSS(dR0, dphi);
       double dAz1[4] = VEC4_CROSS(dR1, dphi);
+      double area = gusto_quad_area_centroid(C->x, /* also sets C->x */
+					     C->verts[0]->x, C->verts[1]->x,
+					     C->verts[2]->x, C->verts[3]->x);
 
-      /* Cell's centroid position */
-      C->x[0] = 0.0;
-      C->x[1] = 0.25 * (C->verts[0]->x[1] + C->verts[1]->x[1] +
-			C->verts[2]->x[1] + C->verts[3]->x[1]);
-      C->x[2] = 0.25 * (C->verts[0]->x[2] + C->verts[1]->x[2] +
-			C->verts[2]->x[2] + C->verts[3]->x[2]);
-      C->x[3] = 0.25 * (C->verts[0]->x[3] + C->verts[1]->x[3] +
-			C->verts[2]->x[3] + C->verts[3]->x[3]);
-
-      /* Cell's area and volume forms */
+      C->dA[0] = area;
       C->dA[1] = 0.50 * (VEC4_MOD(dAR0) + VEC4_MOD(dAR1));
-      C->dA[2] = 0.25 * (VEC4_MOD(dAf0) + VEC4_MOD(dAf1) +
-			 VEC4_MOD(dAf2) + VEC4_MOD(dAf3));
+      C->dA[2] = area;
       C->dA[3] = 0.50 * (VEC4_MOD(dAz0) + VEC4_MOD(dAz1));
 
       if (sim->user.coordinates == 'p') {
-	C->dA[1] = C->dA[1] * C->x[1]; /* multiply by cylindrical radius */
-	C->dA[0] = C->dA[2] * C->x[1]; /* area is per steradian */
-      }
-      else {
-	C->dA[0] = C->dA[2];
+	C->dA[0] *= C->x[1];
+	C->dA[1] *= C->x[1];
+	C->dA[3] *= C->x[1];
       }
 
       /* Cell's longitudinal axis */
-      C->zhat[0] = 0.0;
-      C->zhat[1] = 0.5 * (dAz0[1] + dAz1[1]);
-      C->zhat[2] = 0.5 * (dAz0[2] + dAz1[2]);
-      C->zhat[3] = 0.5 * (dAz0[3] + dAz1[3]);
+      /* C->zhat[0] = 0.0; */
+      /* C->zhat[1] = 0.5 * (dAz0[1] + dAz1[1]); */
+      /* C->zhat[2] = 0.5 * (dAz0[2] + dAz1[2]); */
+      /* C->zhat[3] = 0.5 * (dAz0[3] + dAz1[3]); */
+      /* VEC4_NORMALIZE(C->zhat); */
 
-      VEC4_NORMALIZE(C->zhat);
 
       double dAR = gusto_min3(VEC4_MOD(dAR0), VEC4_MOD(dAR1), 1.0);
       double dAz = gusto_min3(VEC4_MOD(dAz0), VEC4_MOD(dAz1), 1.0);
@@ -481,6 +468,7 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
     F->nhat[1] = dA[1] / F->nhat[0];
     F->nhat[2] = dA[2] / F->nhat[0];
     F->nhat[3] = dA[3] / F->nhat[0];
+
 
 
     /* If in cylindrical coordinates then the face area is multiplied by

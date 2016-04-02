@@ -68,7 +68,7 @@ struct mesh_cell
 {
   double x[4];
   double dA[4];                /* 0: volume, dA1, dA2, dA3: cross-sections */
-  double zhat[4];              /* 1,2,3: cell's longitudinal axis (unit) */
+  //double zhat[4];              /* 1,2,3: cell's longitudinal axis (unit) */
   double U[8];                 /* total mass, energy, momentum, magnetic flux */
   struct mesh_vert *verts[4];
   struct aux_variables aux[5]; /* aux vars at different cell locations */
@@ -92,7 +92,9 @@ struct mesh_row
 /* General utilities */
 void *gusto_start_clock();
 double gusto_stop_clock(void *clock_s);
-
+double gusto_quad_area_centroid(double x0[4],
+				double x1[4], double x2[4],
+				double x3[4], double x4[4]);
 
 /* Mesh operations */
 int gusto_mesh_count(struct gusto_sim *sim, char which, int n);
