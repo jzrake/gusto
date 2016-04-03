@@ -8,7 +8,8 @@
 
 
 
-void initial_data_cylindrical_shock(struct aux_variables *A, double *X)
+void initial_data_cylindrical_shock(struct gusto_user *user,
+				    struct aux_variables *A, double *X)
 {
   double x = X[1] - 0.5;
   double y = X[3] - 0.5;
@@ -24,7 +25,8 @@ void initial_data_cylindrical_shock(struct aux_variables *A, double *X)
 
 
 
-void initial_data_sound_wave(struct aux_variables *A, double *X)
+void initial_data_sound_wave(struct gusto_user *user,
+			     struct aux_variables *A, double *X)
 {
   double k = 2 * M_PI;
   double z = X[3];
@@ -50,20 +52,22 @@ void initial_data_sound_wave(struct aux_variables *A, double *X)
 
 
 
-void initial_data_density_wave(struct aux_variables *A, double *X)
+void initial_data_density_wave(struct gusto_user *user,
+			       struct aux_variables *A, double *X)
 {
   double k = 2 * M_PI;
   double z = X[3];
   double d = 1.0 + 0.01 * sin(k * z);
 
-  A->velocity_four_vector[3] = 0.0;
+  A->velocity_four_vector[3] = 1.0;
   A->comoving_mass_density = d;
   A->gas_pressure = 1.0;
 }
 
 
 
-void initial_data_uniform(struct aux_variables *A, double *X)
+void initial_data_uniform(struct gusto_user *user,
+			  struct aux_variables *A, double *X)
 {
 
 }
@@ -131,7 +135,7 @@ void gusto_initial_data(struct gusto_sim *sim)
 	A->R = 1.0;
       }
 
-      sim->initial_data(A, C->x);
+      sim->initial_data(&sim->user, A, C->x);
 
       gusto_complete_aux(A);
       gusto_to_conserved(A, C->U, C->dA);
@@ -225,27 +229,6 @@ void gusto_compute_vertex_velocities(struct gusto_sim *sim)
       V->v[2] = u[2] / u[0];
       V->v[3] = u[3] / u[0];
     }
-  }
-}
-
-
-
-void gusto_enforce_boundary_condition(struct gusto_sim *sim)
-{
-  for (int n=0; n<sim->num_rows; ++n) {
-    struct mesh_cell *Cinner_bc = sim->rows[n].cells;
-    struct mesh_cell *Couter_bc = sim->rows[n].cells;
-
-    while (Couter_bc->next) Couter_bc = Couter_bc->next;
-
-    struct mesh_cell *Cinner_in = Cinner_bc->next;
-    struct mesh_cell *Couter_in = Couter_bc->prev;
-
-    Cinner_bc->aux[0] = Couter_in->aux[0];
-    Couter_bc->aux[0] = Cinner_in->aux[0];
-
-    gusto_to_conserved(&Cinner_bc->aux[0], Cinner_bc->U, Cinner_bc->dA);
-    gusto_to_conserved(&Couter_bc->aux[0], Couter_bc->U, Couter_bc->dA);
   }
 }
 
@@ -590,4 +573,66 @@ void gusto_riemann(struct aux_variables *AL,
   for (int q=0; q<8; ++q) {
     Fhat[q] = F[q] - s * U[q];
   }
+}
+
+
+
+void bc_none(struct gusto_sim *sim)
+{
+
+}
+
+
+
+void bc_periodic_longitudinal(struct gusto_sim *sim)
+{
+  /* Assumes we have exactly one guard zone in the longitudinal direction. */
+  for (int n=0; n<sim->num_rows; ++n) {
+    struct mesh_cell *Cinner_bc = sim->rows[n].cells;
+    struct mesh_cell *Couter_bc = sim->rows[n].cells;
+
+    while (Couter_bc->next) Couter_bc = Couter_bc->next;
+
+    struct mesh_cell *Cinner_in = Cinner_bc->next;
+    struct mesh_cell *Couter_in = Couter_bc->prev;
+
+    Cinner_bc->aux[0] = Couter_in->aux[0];
+    Couter_bc->aux[0] = Cinner_in->aux[0];
+
+    gusto_to_conserved(&Cinner_bc->aux[0], Cinner_bc->U, Cinner_bc->dA);
+    gusto_to_conserved(&Couter_bc->aux[0], Couter_bc->U, Couter_bc->dA);
+  }
+}
+
+
+
+OpBoundaryCon gusto_lookup_boundary_con(const char *user_key)
+{
+  const char *keys[] = {
+    "none",
+    "periodic_longitudinal",
+    NULL
+  } ;
+  OpBoundaryCon vals[] = {
+    bc_none,
+    bc_periodic_longitudinal,
+    NULL } ;
+  int n = 0;
+  const char *key;
+  OpBoundaryCon val;
+  do {
+    key = keys[n];
+    val = vals[n];
+    if (key == NULL) {
+      break;
+    }
+    else if (strcmp(user_key, key) == 0) {
+      return val;
+    }
+    else {
+      n += 1;
+    }
+  } while (1);
+  printf("[gusto] ERROR: no such boundary_con=%s\n", user_key);
+  return NULL;
 }

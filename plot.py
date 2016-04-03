@@ -16,7 +16,7 @@ def plot_faces(filename):
 
 def plot_1d(filename):
     dset = gusto_dataset.GustoDataset(filename)
-    x = dset.get_cell_variable('x1')
+    x = dset.get_cell_variable('x3')
     y = dset.get_cell_variable('dg')
     plt.plot(x, y, '-o')
 

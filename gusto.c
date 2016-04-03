@@ -8,10 +8,8 @@ void gusto_init(struct gusto_sim *sim)
 {
   sim->num_rows = 0;
   sim->smallest_cell_length = 0.0;
-
   sim->faces = NULL;
   sim->rows = NULL;
-
   gusto_user_set_defaults(&sim->user);
   gusto_status_set_defaults(&sim->status);
 }
@@ -25,7 +23,7 @@ void gusto_free(struct gusto_sim *sim)
 
 void gusto_config_from_user(struct gusto_sim *sim)
 {
-  sim->boundary_con = NULL;
+  sim->boundary_con = gusto_lookup_boundary_con(sim->user.boundary_con);
   sim->initial_mesh = gusto_lookup_initial_mesh(sim->user.initial_mesh);
   sim->initial_data = gusto_lookup_initial_data(sim->user.initial_data);
 }
@@ -34,8 +32,9 @@ void gusto_config_from_user(struct gusto_sim *sim)
 int gusto_is_valid(struct gusto_sim *sim)
 {
   int valid = 1;
-  valid &= sim->initial_mesh != NULL;
+  valid &= sim->boundary_con != NULL;
   valid &= sim->initial_data != NULL;
+  valid &= sim->initial_mesh != NULL;
   return valid;
 }
 
@@ -118,7 +117,7 @@ int main(int argc, char **argv)
     }
 
     gusto_recover_variables(&sim);
-    //gusto_enforce_boundary_condition(&sim);
+    sim.boundary_con(&sim);
 
     double seconds = gusto_stop_clock(start_cycle);
 

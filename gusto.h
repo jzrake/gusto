@@ -15,9 +15,11 @@ struct mesh_vert;
 struct mesh_face;
 struct mesh_cell;
 
-typedef void (*OpInitialMesh)(struct gusto_sim *sim, struct mesh_vert *V);
-typedef void (*OpInitialData)(struct aux_variables *A, double *X);
-typedef void (*OpBoundaryCon)(struct aux_variables *A, double *X);
+
+typedef void (*OpBoundaryCon)(struct gusto_sim *sim);
+typedef void (*OpInitialMesh)(struct gusto_user *user, struct mesh_vert *V);
+typedef void (*OpInitialData)(struct gusto_user *user,
+			      struct aux_variables *A, double *X);
 
 
 struct gusto_sim
@@ -28,9 +30,9 @@ struct gusto_sim
   struct mesh_row *rows;
   struct gusto_user user;
   struct gusto_status status;
+  OpBoundaryCon boundary_con;
   OpInitialMesh initial_mesh;
   OpInitialData initial_data;
-  OpBoundaryCon boundary_con;
 } ;
 
 struct aux_variables
@@ -110,10 +112,6 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim);
 void gusto_mesh_advance_vertices(struct gusto_sim *sim, double dt);
 
 
-/* Initial data functions */
-void initial_data_cylindrical_shock(struct aux_variables *A, double *X);
-void initial_data_sound_wave(struct aux_variables *A, double *X);
-
 
 /* Operations on one or more variable states */
 void gusto_riemann(struct aux_variables *AL, struct aux_variables *AR,
@@ -146,8 +144,9 @@ void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname);
 int gusto_is_valid(struct gusto_sim *sim);
 
 
-OpInitialMesh gusto_lookup_initial_mesh(const char *key);
-OpInitialData gusto_lookup_initial_data(const char *key);
+OpBoundaryCon gusto_lookup_boundary_con(const char *user_key);
+OpInitialMesh gusto_lookup_initial_mesh(const char *user_key);
+OpInitialData gusto_lookup_initial_data(const char *user_key);
 
 
 /*

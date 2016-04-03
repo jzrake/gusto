@@ -10,9 +10,9 @@ struct gusto_user {
     double domain[4];
     char coordinates;
     int move_cells;
-    char initial_data[256];
-    char initial_mesh[256];
     char boundary_con[256];
+    char initial_mesh[256];
+    char initial_data[256];
 };
 
 

@@ -85,21 +85,22 @@ int gusto_mesh_count(struct gusto_sim *sim, char which, int n)
 
 
 
-void initial_mesh_planar(struct gusto_sim *sim, struct mesh_vert *V)
+void initial_mesh_planar(struct gusto_user *user, struct mesh_vert *V)
 {
-  int row_size = sim->user.N[0];
-  int num_rows = sim->user.N[1];
-  int ngR = sim->user.ng[0];
-  int ngz = sim->user.ng[1];
+  /* Longitudinal direction is z */
+  int row_size = user->N[0];
+  int num_rows = user->N[1];
+  int ngz = user->ng[0];
+  int ngR = user->ng[1];
   int NR = num_rows - 2 * ngR;
   int Nz = row_size - 2 * ngz;
   int n = V->row_index     - ngR;
   int i = V->col_index / 2 - ngz;
   int p = V->col_index % 2;
-  double R0 = sim->user.domain[0];
-  double R1 = sim->user.domain[1];
-  double z0 = sim->user.domain[2];
-  double z1 = sim->user.domain[3];
+  double R0 = user->domain[0];
+  double R1 = user->domain[1];
+  double z0 = user->domain[2];
+  double z1 = user->domain[3];
   double dR = (R1 - R0) / NR;
   double dz = (z1 - z0) / Nz;
   V->x[0] = 0.0;
@@ -110,21 +111,22 @@ void initial_mesh_planar(struct gusto_sim *sim, struct mesh_vert *V)
 
 
 
-void initial_mesh_cylindrical(struct gusto_sim *sim, struct mesh_vert *V)
+void initial_mesh_cylindrical(struct gusto_user *user, struct mesh_vert *V)
 {
-  int row_size = sim->user.N[0];
-  int num_rows = sim->user.N[1];
-  int ngz = sim->user.ng[0];
-  int ngR = sim->user.ng[1];
+  /* Longitudinal direction is R */
+  int row_size = user->N[0];
+  int num_rows = user->N[1];
+  int ngR = user->ng[0];
+  int ngz = user->ng[1];
   int Nz = num_rows - 2 * ngz;
   int NR = row_size - 2 * ngR;
   int n = V->row_index     - ngz;
   int i = V->col_index / 2 - ngR;
   int p = V->col_index % 2;
-  double R0 = sim->user.domain[0];
-  double R1 = sim->user.domain[1];
-  double z0 = sim->user.domain[2];
-  double z1 = sim->user.domain[3];
+  double R0 = user->domain[0];
+  double R1 = user->domain[1];
+  double z0 = user->domain[2];
+  double z1 = user->domain[3];
   double dR = (R1 - R0) / NR;
   double dz = (z1 - z0) / Nz;
   V->x[0] = 0.0;
@@ -135,21 +137,22 @@ void initial_mesh_cylindrical(struct gusto_sim *sim, struct mesh_vert *V)
 
 
 
-void initial_mesh_spherical(struct gusto_sim *sim, struct mesh_vert *V)
+void initial_mesh_spherical(struct gusto_user *user, struct mesh_vert *V)
 {
-  int row_size = sim->user.N[0];
-  int num_rows = sim->user.N[1];
-  int ngt = sim->user.ng[0];
-  int ngr = sim->user.ng[1];
+  /* Longitudinal direction is r, uses log binning in r */
+  int row_size = user->N[0];
+  int num_rows = user->N[1];
+  int ngt = user->ng[0];
+  int ngr = user->ng[1];
   int Nt = num_rows - 2 * ngt;
   int Nr = row_size - 2 * ngr;
   int n = V->row_index     - ngt;
   int i = V->col_index / 2 - ngr;
   int p = V->col_index % 2;
-  double r0 = sim->user.domain[0];
-  double r1 = sim->user.domain[1];
-  double t0 = sim->user.domain[2];
-  double t1 = sim->user.domain[3];
+  double r0 = user->domain[0];
+  double r1 = user->domain[1];
+  double t0 = user->domain[2];
+  double t1 = user->domain[3];
   double dr = log(r1 / r0) / Nr;
   double dt = (t1 - t0) / Nt;
   double r = r0 * exp(i * dr);
@@ -203,8 +206,9 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
   sim->rows = (struct mesh_row *) malloc(sim->num_rows*sizeof(struct mesh_row));
 
   int row_size = sim->user.N[0];
-  int ngR = sim->user.ng[0]; /* number of ghost cells in the R direction */
-  int ngz = sim->user.ng[1]; /* number of ghost cells in the z direction */
+  int ngz = sim->user.ng[0]; /* number of ghost cells in the long direction */
+  int ngR = sim->user.ng[1]; /* number of ghost cells in the tran direction */
+
 
   for (int n=0; n<sim->num_rows+ngR; ++n) {
 
@@ -247,8 +251,8 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
       VL->col_index = 2*i + 0;
       VR->col_index = 2*i + 1;
 
-      sim->initial_mesh(sim, VL);
-      sim->initial_mesh(sim, VR);
+      sim->initial_mesh(&sim->user, VL);
+      sim->initial_mesh(&sim->user, VR);
 
       for (int d=0; d<4; ++d) { /* vertex velocities */
 	VL->v[d] = 0.0;
@@ -561,6 +565,7 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
       F->nhat[2] *= -1;
       F->nhat[3] *= -1;
     }
+
 
 
     /* This is a self-consistency check. It should be guarenteed by the previous
