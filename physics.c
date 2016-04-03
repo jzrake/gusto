@@ -54,7 +54,7 @@ void initial_data_density_wave(struct aux_variables *A, double *X)
 {
   double k = 2 * M_PI;
   double z = X[3];
-  double d = 1.0 + 0.0 * sin(k * z);
+  double d = 1.0 + 0.01 * sin(k * z);
 
   A->velocity_four_vector[3] = 0.0;
   A->comoving_mass_density = d;
@@ -63,14 +63,25 @@ void initial_data_density_wave(struct aux_variables *A, double *X)
 
 
 
+void initial_data_uniform(struct aux_variables *A, double *X)
+{
+
+}
+
+
+
 OpInitialData gusto_lookup_initial_data(const char *user_key)
 {
   const char *keys[] = {
+    "uniform",
     "cylindrical_shock",
+    "density_wave",
     NULL
   } ;
   OpInitialData vals[] = {
+    initial_data_uniform,
     initial_data_cylindrical_shock,
+    initial_data_density_wave,
     NULL } ;
   int n = 0;
   const char *key;
@@ -78,13 +89,17 @@ OpInitialData gusto_lookup_initial_data(const char *user_key)
   do {
     key = keys[n];
     val = vals[n];
-    if (strcmp(user_key, key) == 0) {
+    if (key == NULL) {
+      break;
+    }
+    else if (strcmp(user_key, key) == 0) {
       return val;
     }
     else {
       n += 1;
     }
-  } while (key);
+  } while (1);
+  printf("[gusto] ERROR: no such initial_data=%s\n", user_key);
   return NULL;
 }
 
@@ -108,13 +123,15 @@ void gusto_initial_data(struct gusto_sim *sim)
       A->magnetic_four_vector[2] = 0.0;
       A->magnetic_four_vector[3] = 0.0;
 
-      if (sim->user.coordinates == 'p') {
+      if (sim->user.coordinates == 'c' ||
+	  sim->user.coordinates == 's') {
 	A->R = C->x[1];
       }
+      else {
+	A->R = 1.0;
+      }
 
-      //initial_data_density_wave(A, C->x);
-      //initial_data_cylindrical_shock(A, C->x);
-      initial_data_density_wave(A, C->x);
+      sim->initial_data(A, C->x);
 
       gusto_complete_aux(A);
       gusto_to_conserved(A, C->U, C->dA);
@@ -168,14 +185,17 @@ void gusto_transmit_fluxes(struct gusto_sim *sim, double dt)
 void gusto_add_source_terms(struct gusto_sim *sim, double dt)
 {
   struct mesh_cell *C;
-  double Udot[8];
+  double Udot[8] = {0,0,0,0,0,0,0,0};
   for (int n=0; n<sim->num_rows; ++n) {
     DL_FOREACH(sim->rows[n].cells, C) {
-      if (sim->user.coordinates == 'p') {
-	gusto_cylindrical_source_terms(&C->aux[0], Udot);
-	for (int q=0; q<8; ++q) {
-	  C->U[q] += Udot[q] * C->dA[0] * dt;
-	}
+
+      switch (sim->user.coordinates) {
+      case 'c': gusto_cylindrical_source_terms(&C->aux[0], Udot); break;
+      case 's': gusto_spherical_source_terms(&C->aux[0], Udot); break;
+      }
+
+      for (int q=0; q<8; ++q) {
+	C->U[q] += Udot[q] * C->dA[0] * dt;
       }
     }
   }
@@ -508,6 +528,21 @@ void gusto_cylindrical_source_terms(struct aux_variables *A, double Udot[8])
   double pb = A->magnetic_pressure;
   double H0 = A->enthalpy_density;
   Udot[S11] = (pg + pb + u[3]*u[3]*H0 - b[3]*b[3]) / A->R;
+}
+
+
+
+void gusto_spherical_source_terms(struct aux_variables *A, double Udot[8])
+{
+  double *u = A->velocity_four_vector;
+  double *b = A->magnetic_four_vector;
+  double pg = A->gas_pressure;
+  double pb = A->magnetic_pressure;
+  double H0 = A->enthalpy_density;
+
+  /* This is intended to be used for 1D meshes, and is valid only on the
+     equatorial plane. */
+  Udot[S11] = (2*(pg + pb) + u[3]*u[3]*H0 - b[3]*b[3]) / A->R;
 }
 
 

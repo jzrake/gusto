@@ -12,9 +12,10 @@ user_struct = [
     ('N', 'int[2]', [128, 1]),
     ('ng', 'int[2]', [0, 0]),
     ('domain', 'double[4]', [0, 1, 0, 1]),
-    ('coordinates', 'char', 'c'),
+    ('coordinates', 'char', 'p'),
     ('move_cells', 'int', 0),
-    ('initial_data', 'char[256]', 'density_wave'),
+    ('initial_data', 'char[256]', 'uniform'),
+    ('initial_mesh', 'char[256]', 'planar'),
     ('boundary_con', 'char[256]', ''),
 ]
 

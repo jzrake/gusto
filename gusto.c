@@ -26,9 +26,18 @@ void gusto_free(struct gusto_sim *sim)
 void gusto_config_from_user(struct gusto_sim *sim)
 {
   sim->boundary_con = NULL;
+  sim->initial_mesh = gusto_lookup_initial_mesh(sim->user.initial_mesh);
   sim->initial_data = gusto_lookup_initial_data(sim->user.initial_data);
 }
 
+
+int gusto_is_valid(struct gusto_sim *sim)
+{
+  int valid = 1;
+  valid &= sim->initial_mesh != NULL;
+  valid &= sim->initial_data != NULL;
+  return valid;
+}
 
 
 /*
@@ -63,6 +72,12 @@ int main(int argc, char **argv)
 
   gusto_user_report(&sim.user);
   gusto_config_from_user(&sim);
+
+  if (!gusto_is_valid(&sim)) {
+    printf("[gusto] ERROR: invalid setup\n");
+    return 0;
+  }
+
   gusto_mesh_generate_verts(&sim);
   gusto_mesh_generate_cells(&sim);
   gusto_mesh_generate_faces(&sim);

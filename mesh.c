@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <math.h>
 #include "utlist.h"
 #include "gusto.h"
@@ -84,39 +85,76 @@ int gusto_mesh_count(struct gusto_sim *sim, char which, int n)
 
 
 
-void vert_pos_staggered_cartesian(struct gusto_sim *sim, struct mesh_vert *V,
-				  int n, int i, int NR, int Nz, char pm)
+void initial_mesh_planar(struct gusto_sim *sim, struct mesh_vert *V)
 {
+  int row_size = sim->user.N[0];
+  int num_rows = sim->user.N[1];
+  int ngR = sim->user.ng[0];
+  int ngz = sim->user.ng[1];
+  int NR = num_rows - 2 * ngR;
+  int Nz = row_size - 2 * ngz;
+  int n = V->row_index     - ngR;
+  int i = V->col_index / 2 - ngz;
+  int p = V->col_index % 2;
   double R0 = sim->user.domain[0];
   double R1 = sim->user.domain[1];
   double z0 = sim->user.domain[2];
   double z1 = sim->user.domain[3];
   double dR = (R1 - R0) / NR;
   double dz = (z1 - z0) / Nz;
-
   V->x[0] = 0.0;
-  V->x[1] = R0 + (n + (pm == 'p')) * dR;
+  V->x[1] = R0 + (n + p) * dR;
   V->x[2] = 0.0;
-  V->x[3] = z0 + i * dz + 0.5 * dz * (n % 2 == 0);
+  V->x[3] = z0 + (i + 0) * dz + 0.5 * dz * (n % 2 == 0);
 }
 
 
 
-void vert_pos_radial(struct gusto_sim *sim, struct mesh_vert *V,
-		     int n, int i, int Nt, int Nr, char pm)
+void initial_mesh_cylindrical(struct gusto_sim *sim, struct mesh_vert *V)
 {
+  int row_size = sim->user.N[0];
+  int num_rows = sim->user.N[1];
+  int ngz = sim->user.ng[0];
+  int ngR = sim->user.ng[1];
+  int Nz = num_rows - 2 * ngz;
+  int NR = row_size - 2 * ngR;
+  int n = V->row_index     - ngz;
+  int i = V->col_index / 2 - ngR;
+  int p = V->col_index % 2;
+  double R0 = sim->user.domain[0];
+  double R1 = sim->user.domain[1];
+  double z0 = sim->user.domain[2];
+  double z1 = sim->user.domain[3];
+  double dR = (R1 - R0) / NR;
+  double dz = (z1 - z0) / Nz;
+  V->x[0] = 0.0;
+  V->x[1] = R0 + (i + 0) * dR;
+  V->x[2] = 0.0;
+  V->x[3] = z0 + (n + p) * dz;
+}
+
+
+
+void initial_mesh_spherical(struct gusto_sim *sim, struct mesh_vert *V)
+{
+  int row_size = sim->user.N[0];
+  int num_rows = sim->user.N[1];
+  int ngt = sim->user.ng[0];
+  int ngr = sim->user.ng[1];
+  int Nt = num_rows - 2 * ngt;
+  int Nr = row_size - 2 * ngr;
+  int n = V->row_index     - ngt;
+  int i = V->col_index / 2 - ngr;
+  int p = V->col_index % 2;
   double r0 = sim->user.domain[0];
   double r1 = sim->user.domain[1];
   double t0 = sim->user.domain[2];
   double t1 = sim->user.domain[3];
   double dr = log(r1 / r0) / Nr;
   double dt = (t1 - t0) / Nt;
-
   double r = r0 * exp(i * dr);
-  double t = t0 + dt * (n + (pm == 'p'));
-
-  /* Theta is measured from the equatorial plane, not the pole. */
-  V->x[0] = 0.0;
+  double t = t0 + dt * (n + p);
+  V->x[0] = 0.0; /* Theta is measured from equatorial plane, not the pole. */
   V->x[1] = r * cos(t);
   V->x[2] = 0.0;
   V->x[3] = r * sin(t);
@@ -124,21 +162,37 @@ void vert_pos_radial(struct gusto_sim *sim, struct mesh_vert *V,
 
 
 
-void vert_pos_cylindrical(struct gusto_sim *sim, struct mesh_vert *V,
-			  int n, int i, int Nz, int NR, char pm)
+OpInitialMesh gusto_lookup_initial_mesh(const char *user_key)
 {
-  double R0 = sim->user.domain[0];
-  double R1 = sim->user.domain[1];
-  double z0 = sim->user.domain[2];
-  double z1 = sim->user.domain[3];
-  double dR = (R1 - R0) / NR;
-  double dz = (z1 - z0) / Nz;
-
-
-  V->x[0] = 0.0;
-  V->x[1] = R0 + i * dR;
-  V->x[2] = 0.0;
-  V->x[3] = z0 + (n + (pm == 'p')) * dz;
+  const char *keys[] = {
+    "planar",
+    "cylindrical",
+    "spherical",
+    NULL
+  } ;
+  OpInitialMesh vals[] = {
+    initial_mesh_planar,
+    initial_mesh_cylindrical,
+    initial_mesh_spherical,
+    NULL } ;
+  int n = 0;
+  const char *key;
+  OpInitialMesh val;
+  do {
+    key = keys[n];
+    val = vals[n];
+    if (key == NULL) {
+      break;
+    }
+    else if (strcmp(user_key, key) == 0) {
+      return val;
+    }
+    else {
+      n += 1;
+    }
+  } while (1);
+  printf("[gusto] ERROR: no such initial_mesh=%s\n", user_key);
+  return NULL;
 }
 
 
@@ -152,7 +206,7 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
   int ngR = sim->user.ng[0]; /* number of ghost cells in the R direction */
   int ngz = sim->user.ng[1]; /* number of ghost cells in the z direction */
 
-  for (int n=0; n<sim->num_rows; ++n) {
+  for (int n=0; n<sim->num_rows+ngR; ++n) {
 
     /* Iteration variables for going over the linked list: */
     struct mesh_vert *VL, *VR;
@@ -185,11 +239,6 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
      * ---------------------------------------------------------------------- */
     for (int i=0; i<row_size+ngz+1; ++i) {
 
-      int NR = sim->num_rows - 2 * ngR; /* number of interior R cells */
-      int Nz = row_size      - 2 * ngz; /* number of interior z cells */
-      int n_real = n - ngR;
-      int i_real = i - ngz;
-
       VL = (struct mesh_vert *) malloc(sizeof(struct mesh_vert));
       VR = (struct mesh_vert *) malloc(sizeof(struct mesh_vert));
 
@@ -198,14 +247,8 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
       VL->col_index = 2*i + 0;
       VR->col_index = 2*i + 1;
 
-      /* vert_pos_staggered_cartesian(sim, VL, n_real, i_real, NR, Nz, 'm'); */
-      /* vert_pos_staggered_cartesian(sim, VR, n_real, i_real, NR, Nz, 'p'); */
-
-      vert_pos_cylindrical(sim, VL, n_real, i_real, NR, Nz, 'm');
-      vert_pos_cylindrical(sim, VR, n_real, i_real, NR, Nz, 'p');
-
-      /* vert_pos_radial(sim, VL, n_real, i_real, NR, Nz, 'm'); */
-      /* vert_pos_radial(sim, VR, n_real, i_real, NR, Nz, 'p'); */
+      sim->initial_mesh(sim, VL);
+      sim->initial_mesh(sim, VR);
 
       for (int d=0; d<4; ++d) { /* vertex velocities */
 	VL->v[d] = 0.0;
@@ -348,13 +391,11 @@ void gusto_mesh_generate_faces(struct gusto_sim *sim)
 	double lp = VEC4_DOT(Vp->x, dl);
 
 	if (lm < lp) {
-	  //printf("m\n");
 	  which = 'm';
 	  V1 = Vm;
 	  Vm = Vm->next ? Vm->next->next : NULL;
 	}
 	else {
-	  //printf("p\n");
 	  which = 'p';
 	  V1 = Vp;
 	  Vp = Vp->next ? Vp->next->next : NULL;
@@ -454,7 +495,8 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
       C->dA[2] = area;
       C->dA[3] = 0.50 * (VEC4_MOD(dAz0) + VEC4_MOD(dAz1));
 
-      if (sim->user.coordinates == 'p') {
+      if (sim->user.coordinates == 'c' ||
+	  sim->user.coordinates == 's') {
 	C->dA[0] *= C->x[1] * 2 * M_PI;
 	C->dA[1] *= C->x[1] * 2 * M_PI;
 	C->dA[3] *= C->x[1] * 2 * M_PI;
@@ -493,9 +535,10 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
 
 
 
-    /* If in cylindrical coordinates then the face area is multiplied by
-       R. There's a bug here: why does dividing by 2 make it work? */
-    if (sim->user.coordinates == 'p') {
+    /* If in cylindrical or spherical coordinates then the face area is
+       multiplied by R. */
+    if (sim->user.coordinates == 'c' ||
+	sim->user.coordinates == 's') {
       F->nhat[0] *= x0[1] * 2 * M_PI;
     }
 
