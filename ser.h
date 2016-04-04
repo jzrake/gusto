@@ -13,6 +13,12 @@ struct gusto_user {
     char boundary_con[256];
     char initial_mesh[256];
     char initial_data[256];
+    double pressure0;
+    double pressure1;
+    double density0;
+    double density1;
+    double fourvel0;
+    double fourvel1;
 };
 
 

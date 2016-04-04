@@ -17,6 +17,12 @@ user_struct = [
     ('boundary_con', 'char[256]', 'none'),
     ('initial_mesh', 'char[256]', 'planar'),
     ('initial_data', 'char[256]', 'uniform'),
+    ('pressure0', 'double', 1.0),
+    ('pressure1', 'double', 1.0),
+    ('density0', 'double', 1.0),
+    ('density1', 'double', 1.0),
+    ('fourvel0', 'double', 1.0),
+    ('fourvel1', 'double', 1.0),
 ]
 
 

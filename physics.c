@@ -1,6 +1,7 @@
+#include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 #include <math.h>
-#include <string.h>
 #include "utlist.h"
 #include "gusto.h"
 #include "srmhd_c2p.h"
@@ -69,7 +70,8 @@ void initial_data_density_wave(struct gusto_user *user,
 void initial_data_uniform(struct gusto_user *user,
 			  struct aux_variables *A, double *X)
 {
-
+  A->comoving_mass_density = user->density1;
+  A->gas_pressure = user->pressure1;
 }
 
 
@@ -357,6 +359,7 @@ int gusto_from_conserved(struct aux_variables *A, double U[8], double dA[4])
   srmhd_c2p_estimate_from_cons(c2p);
 
   int error = srmhd_c2p_solve_noble1dw(c2p, Pin);
+  //int error = srmhd_c2p_solve_anton2dzw(c2p, Pin);
   double B1 = Uin[B11];
   double B2 = Uin[B22];
   double B3 = Uin[B33];
@@ -390,11 +393,11 @@ int gusto_from_conserved(struct aux_variables *A, double U[8], double dA[4])
     printf("c2p failed: %s\n", srmhd_c2p_get_error(c2p, error));
     printf("%f %f %f %f %f %f %f %f\n",
 	   Uin[0], Uin[1], Uin[2], Uin[3], Uin[4], Uin[5], Uin[6], Uin[7]);
+    exit(1);
   }
 
   return error;
 }
-
 
 
 
@@ -606,16 +609,42 @@ void bc_periodic_longitudinal(struct gusto_sim *sim)
 
 
 
+void bc_inflow_outflow(struct gusto_sim *sim)
+{
+  for (int n=0; n<sim->num_rows; ++n) {
+    struct mesh_cell *Cinner0 = sim->rows[n].cells;
+    struct mesh_cell *Couter0 = sim->rows[n].cells;
+
+    while (Couter0->next) Couter0 = Couter0->next;
+
+    struct mesh_cell *Couter1 = Couter0->prev;
+    Couter0->aux[0] = Couter1->aux[0];
+    Couter0->aux[0].gas_pressure = sim->user.pressure1;
+    Cinner0->aux[0].gas_pressure = sim->user.pressure0;
+    Cinner0->aux[0].comoving_mass_density = sim->user.density0;
+    Cinner0->aux[0].velocity_four_vector[1] = sim->user.fourvel0;
+
+    gusto_complete_aux(&Cinner0->aux[0]);
+    gusto_complete_aux(&Couter0->aux[0]);
+    gusto_to_conserved(&Cinner0->aux[0], Cinner0->U, Cinner0->dA);
+    gusto_to_conserved(&Couter0->aux[0], Couter0->U, Couter0->dA);
+  }
+}
+
+
+
 OpBoundaryCon gusto_lookup_boundary_con(const char *user_key)
 {
   const char *keys[] = {
     "none",
     "periodic_longitudinal",
+    "inflow_outflow",
     NULL
   } ;
   OpBoundaryCon vals[] = {
     bc_none,
     bc_periodic_longitudinal,
+    bc_inflow_outflow,
     NULL } ;
   int n = 0;
   const char *key;
