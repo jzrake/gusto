@@ -513,7 +513,7 @@ void gusto_cylindrical_source_terms(struct aux_variables *A, double Udot[8])
   double pg = A->gas_pressure;
   double pb = A->magnetic_pressure;
   double H0 = A->enthalpy_density;
-  Udot[S11] = (pg + pb + u[3]*u[3]*H0 - b[3]*b[3]) / A->R;
+  Udot[S11] = (pg + pb + u[2]*u[2]*H0 - b[2]*b[2]) / A->R;
 }
 
 
@@ -528,7 +528,7 @@ void gusto_spherical_source_terms(struct aux_variables *A, double Udot[8])
 
   /* This is intended to be used for 1D meshes, and is valid only on the
      equatorial plane. */
-  Udot[S11] = (2*(pg + pb) + u[3]*u[3]*H0 - b[3]*b[3]) / A->R;
+  Udot[S11] = (2*(pg + pb) + u[2]*u[2]*H0 - b[2]*b[2]) / A->R;
 }
 
 
