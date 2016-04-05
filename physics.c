@@ -285,7 +285,7 @@ void gusto_complete_aux(struct aux_variables *A)
   double ub3 = u[1]*b[1] + u[2]*b[2] + u[3]*b[3];
 
   u[0] = sqrt(1.0 + uu3);
-  b[0] = u[0] * ub3 / (1 + u[0] * uu3);
+  b[0] = ub3 / u[0];
 
   double bb = b[1]*b[1] + b[2]*b[2] + b[3]*b[3] - b[0]*b[0];
   double dg = A->comoving_mass_density;
