@@ -66,6 +66,7 @@ struct mesh_face
   double Fhat[8]; /* Godunov fluxes */
   double nhat[4]; /* 0: face area, 1,2,3: unit normal */
   double Bflux;   /* magnetic flux through face */
+  double length;  /* distance between face's 2 vertices */
   struct mesh_vert *verts[2];
   struct mesh_cell *cells[2];
   struct mesh_face *next;

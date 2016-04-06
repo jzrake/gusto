@@ -295,16 +295,8 @@ void gusto_transmit_fluxes(struct gusto_sim *sim, double dt)
       if (CR) CR->U[q] += F->Fhat[q] * F->nhat[0] * dt;
     }
 
-    if (sim->user.coordinates == 'c' ||
-	sim->user.coordinates == 's') {
-      double R = F->verts[0]->x[1];
-      if (CL) CL->U[B22] -= F->Fhat[B22] * F->nhat[0]/R * dt;
-      if (CR) CR->U[B22] += F->Fhat[B22] * F->nhat[0]/R * dt;
-    }
-    else {
-      if (CL) CL->U[B22] -= F->Fhat[B22] * F->nhat[0] * dt;
-      if (CR) CR->U[B22] += F->Fhat[B22] * F->nhat[0] * dt;
-    }
+    if (CL) CL->U[B22] -= F->Fhat[B22] * F->length * dt;
+    if (CR) CR->U[B22] += F->Fhat[B22] * F->length * dt;
   }
 }
 
@@ -313,7 +305,7 @@ void gusto_transmit_fluxes(struct gusto_sim *sim, double dt)
 void gusto_add_source_terms(struct gusto_sim *sim, double dt)
 {
   struct mesh_cell *C;
-  double Udot[8] = {0,0,0,0,0,0,0,0};
+  double Udot[5] = {0,0,0,0,0};
   for (int n=0; n<sim->num_rows; ++n) {
     DL_FOREACH(sim->rows[n].cells, C) {
 
@@ -322,7 +314,7 @@ void gusto_add_source_terms(struct gusto_sim *sim, double dt)
       case 's': gusto_spherical_source_terms(&C->aux[0], Udot); break;
       }
 
-      for (int q=0; q<8; ++q) {
+      for (int q=0; q<5; ++q) {
 	C->U[q] += Udot[q] * C->dA[0] * dt;
       }
     }

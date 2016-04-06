@@ -21,7 +21,7 @@ def plot_1d(filename):
     x = dset.get_cell_variable('x1')
     y = dset.get_cell_variable('u1')
     c = float(global_vars['file_index']) / global_vars['num_files']
-    plt.plot(x, y, '-o', c=[c]*3)
+    plt.plot(x, y, '-', c=[c]*3)
 
 
 def triangle_variable_plot(filename):

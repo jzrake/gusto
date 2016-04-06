@@ -533,6 +533,8 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
     double x0[4] = VEC4_AVG(F->verts[1]->x, F->verts[0]->x);
     double dA[4] = VEC4_CROSS(df, dx);
 
+    F->length = VEC4_MOD(dx);
+
     F->nhat[0] = VEC4_MOD(dA);
     F->nhat[1] = dA[1] / F->nhat[0];
     F->nhat[2] = dA[2] / F->nhat[0];
@@ -541,7 +543,7 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
 
 
     /* If in cylindrical or spherical coordinates then the face area is
-       multiplied by R. */
+       multiplied by 2 pi R. */
     if (sim->user.coordinates == 'c' ||
 	sim->user.coordinates == 's') {
       F->nhat[0] *= x0[1] * STERADIAN;
@@ -569,7 +571,7 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
 
 
 
-    /* This is a self-consistency check. It should be guarenteed by the previous
+    /* This is a self-consistency check. It should be guaranteed by the previous
        lines. */
     if (F->cells[0] && F->cells[1]) {
       double dL[4] = VEC4_SUB(F->cells[1]->x, F->cells[0]->x);
