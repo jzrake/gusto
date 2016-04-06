@@ -120,14 +120,20 @@ void initial_data_michel69(struct gusto_user *user,
   double br = (Br + b0 * ur) / u0;
   double bf = (Bf + b0 * uf) / u0;
   double f = Phi * Phi / (4 * M_PI * c * r0 * r0); /* mass rate per steradian */
+  double d = f / (r * r * ur);
+  double s = user->entropy; /* log(p / rho^Gamma) */
+  double p = exp(s) * pow(d, 4./3);
 
   A->velocity_four_vector[1] = ur;
   A->velocity_four_vector[2] = uf;
   A->magnetic_four_vector[1] = br / sqrt(4 * M_PI);
   A->magnetic_four_vector[2] = bf / sqrt(4 * M_PI);
-  A->comoving_mass_density = f / (r * r * ur);
-  A->gas_pressure = user->pressure0;
+  A->comoving_mass_density = d;
+  A->gas_pressure = p;
 
+  //printf("p=%e\n", p);
+
+  //printf("s=%f d=%e\n", log(A->gas_pressure / pow(A->comoving_mass_density, 4./3)), A->comoving_mass_density);
   /* double z = 1.0; */
   /* double k = Phi / (c * r0 * r0); */
   /* double dg = A->comoving_mass_density; */
