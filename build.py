@@ -14,6 +14,7 @@ user_struct = [
     ('domain', 'double[4]', [0, 1, 0, 1]),
     ('coordinates', 'char', 'p'),
     ('move_cells', 'int', 0),
+    ('mesh_stagger', 'double', 0.0),
     ('boundary_con', 'char[256]', 'none'),
     ('initial_mesh', 'char[256]', 'planar'),
     ('initial_data', 'char[256]', 'uniform'),

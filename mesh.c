@@ -89,15 +89,16 @@ int gusto_mesh_count(struct gusto_sim *sim, char which, int n)
 void initial_mesh_planar(struct gusto_user *user, struct mesh_vert *V)
 {
   /* Longitudinal direction is z */
-  int row_size = user->N[0];
-  int num_rows = user->N[1];
   int ngz = user->ng[0];
   int ngR = user->ng[1];
+  int row_size = user->N[0] + 2 * ngz;
+  int num_rows = user->N[1] + 2 * ngR;
   int NR = num_rows - 2 * ngR;
   int Nz = row_size - 2 * ngz;
   int n = V->row_index     - ngR;
   int i = V->col_index / 2 - ngz;
   int p = V->col_index % 2;
+  double st = user->mesh_stagger;
   double R0 = user->domain[0];
   double R1 = user->domain[1];
   double z0 = user->domain[2];
@@ -107,7 +108,7 @@ void initial_mesh_planar(struct gusto_user *user, struct mesh_vert *V)
   V->x[0] = 0.0;
   V->x[1] = R0 + (n + p) * dR;
   V->x[2] = 0.0;
-  V->x[3] = z0 + (i + 0) * dz + 0.5 * dz * (n % 2 == 0);
+  V->x[3] = z0 + (i + 0) * dz + st * dz * (n % 2 == 0);
 }
 
 
@@ -115,10 +116,10 @@ void initial_mesh_planar(struct gusto_user *user, struct mesh_vert *V)
 void initial_mesh_cylindrical(struct gusto_user *user, struct mesh_vert *V)
 {
   /* Longitudinal direction is R */
-  int row_size = user->N[0];
-  int num_rows = user->N[1];
   int ngR = user->ng[0];
   int ngz = user->ng[1];
+  int row_size = user->N[0] + 2 * ngR;
+  int num_rows = user->N[1] + 2 * ngz;
   int Nz = num_rows - 2 * ngz;
   int NR = row_size - 2 * ngR;
   int n = V->row_index     - ngz;
@@ -203,15 +204,15 @@ OpInitialMesh gusto_lookup_initial_mesh(const char *user_key)
 
 void gusto_mesh_generate_verts(struct gusto_sim *sim)
 {
-  sim->num_rows = sim->user.N[1];
-  sim->rows = (struct mesh_row *) malloc(sim->num_rows*sizeof(struct mesh_row));
 
   int row_size = sim->user.N[0];
   int ngz = sim->user.ng[0]; /* number of ghost cells in the long direction */
   int ngR = sim->user.ng[1]; /* number of ghost cells in the tran direction */
 
+  sim->num_rows = sim->user.N[1] + 2 * ngR;
+  sim->rows = (struct mesh_row *) malloc(sim->num_rows*sizeof(struct mesh_row));
 
-  for (int n=0; n<sim->num_rows+ngR; ++n) {
+  for (int n=0; n<sim->num_rows; ++n) {
 
     /* Iteration variables for going over the linked list: */
     struct mesh_vert *VL, *VR;
@@ -242,7 +243,7 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
     /* ----------------------------------------------------------------------
      * Add the vertices, two for each i index (z coordinate).
      * ---------------------------------------------------------------------- */
-    for (int i=0; i<row_size+ngz+1; ++i) {
+    for (int i=0; i<row_size+2*ngz+1; ++i) {
 
       VL = (struct mesh_vert *) malloc(sizeof(struct mesh_vert));
       VR = (struct mesh_vert *) malloc(sizeof(struct mesh_vert));

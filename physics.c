@@ -34,8 +34,8 @@ const char **initial_data_cylindrical_shock(struct gusto_user *user,
 
 
 
-const char ** initial_data_sound_wave(struct gusto_user *user,
-				      struct aux_variables *A, double *X)
+const char **initial_data_sound_wave(struct gusto_user *user,
+				     struct aux_variables *A, double *X)
 {
   if (A == NULL) {
     static const char *help[] = { "-- Sound wave --",
