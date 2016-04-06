@@ -23,6 +23,7 @@ user_struct = [
     ('density1', 'double', 1.0),
     ('fourvel0', 'double', 1.0),
     ('fourvel1', 'double', 1.0),
+    ('sigma', 'double', 1.0),
 ]
 
 

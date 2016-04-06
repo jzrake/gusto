@@ -19,6 +19,7 @@ struct gusto_user {
     double density1;
     double fourvel0;
     double fourvel1;
+    double sigma;
 };
 
 

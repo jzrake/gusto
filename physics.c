@@ -76,18 +76,90 @@ void initial_data_uniform(struct gusto_user *user,
 
 
 
+void initial_data_michel69(struct gusto_user *user,
+			   struct aux_variables *A, double *X)
+{
+  double r = X[1];
+  double c = 1.0;
+  double Phi = 1.0;
+  double sig = user->sigma;
+  double eta = pow(sig, 1./3);
+  double lam = (pow(1 + eta * eta, 1.5) - 1) / sig;
+  double rL = 1.0; /* light cylinder radius */
+  double r0 = rL * sqrt(sig);
+  double Br = Phi / (r * r);
+  double xc2 = lam / (1 + sig * lam); /* critical point, xc^2 */
+
+  double x2 = pow(r / r0, 2);
+  double x4 = pow(r / r0, 4);
+  double d0 = -sig * x2 + sig * sig * x4;
+  double d1 = 2 * sig * x4;
+  double d2 = 1 + sig * x2 * (lam * lam - 2) + sig * x4 * (sig - lam * (2 + lam * sig));
+  double d3 = -2 * x2 + 2 * sig * x4;
+  double d4 = x4;
+
+  double roots[4];
+  double ur;
+  int nr = solve_quartic_equation(d4, d3, d2, d1, d0, roots);
+
+  if (nr != 4) {
+    printf("[gusto] WARNING: michel69 solution has imaginary roots\n");
+  }
+
+  if (x2 < xc2) {
+    ur = roots[1];
+  }
+  else {
+    ur = roots[2];
+  }
+
+  double uf = sqrt(sig * x2) * (1 - lam * ur) / (1 - x2 * (ur + sig));
+  double Bf = sqrt(sig * x2) * Br * (x2 * (1 + lam * sig) - lam) / (1 - x2 * (ur + sig));
+  double u0 = sqrt(1.0 + ur*ur + uf*uf);
+  double b0 = Br*ur + Bf*uf;
+  double br = (Br + b0 * ur) / u0;
+  double bf = (Bf + b0 * uf) / u0;
+  double f = Phi * Phi / (4 * M_PI * c * r0 * r0); /* mass rate per steradian */
+
+  A->velocity_four_vector[1] = ur;
+  A->velocity_four_vector[2] = uf;
+  A->magnetic_four_vector[1] = br / sqrt(4 * M_PI);
+  A->magnetic_four_vector[2] = bf / sqrt(4 * M_PI);
+  A->comoving_mass_density = f / (r * r * ur);
+  A->gas_pressure = user->pressure0;
+
+  /* double z = 1.0; */
+  /* double k = Phi / (c * r0 * r0); */
+  /* double dg = A->comoving_mass_density; */
+  /* double bb = br*br + bf*bf - b0*b0; */
+  /* double mu = u0 * z * c * c - r * (c/rL) * Bf / k; */
+  /* double el = uf * z * r - r * Bf / k; */
+  /* double n[4] = {0, 1, 0, 0}; */
+  /* double F[8]; */
+
+  /* A->R = r; */
+  /* gusto_complete_aux(A); */
+  /* gusto_fluxes(A, n, F); */
+
+  //printf("mu=%f el=%f F[TAU]=%f F[S22]=%f F[B22]=%f\n", mu, el, r*r*F[TAU], r*r*F[S22], r*F[B22]);
+}
+
+
+
 OpInitialData gusto_lookup_initial_data(const char *user_key)
 {
   const char *keys[] = {
     "uniform",
     "cylindrical_shock",
     "density_wave",
+    "michel69",
     NULL
   } ;
   OpInitialData vals[] = {
     initial_data_uniform,
     initial_data_cylindrical_shock,
     initial_data_density_wave,
+    initial_data_michel69,
     NULL } ;
   int n = 0;
   const char *key;
@@ -473,10 +545,10 @@ int gusto_fluxes(struct aux_variables *A, double n[4], double F[8])
   const double S1 = A->momentum_density[1];
   const double S2 = A->momentum_density[2];
   const double S3 = A->momentum_density[3];
-  const double d0 = A->comoving_mass_density;
+  const double dg = A->comoving_mass_density;
   const double pg = A->gas_pressure;
   const double pb = A->magnetic_pressure;
-  const double D0 = d0 * u0;
+  const double D0 = dg * u0;
   const double n1 = n[1];
   const double n2 = n[2];
   const double n3 = n[3];
@@ -609,6 +681,26 @@ void bc_periodic_longitudinal(struct gusto_sim *sim)
 
 
 
+void bc_inflow(struct gusto_sim *sim)
+{
+  for (int n=0; n<sim->num_rows; ++n) {
+    struct mesh_cell *Cinner0 = sim->rows[n].cells;
+    struct mesh_cell *Couter0 = sim->rows[n].cells;
+
+    while (Couter0->next) Couter0 = Couter0->next;
+
+    sim->initial_data(&sim->user, &Couter0->aux[0], Couter0->x);
+    sim->initial_data(&sim->user, &Cinner0->aux[0], Cinner0->x);
+
+    gusto_complete_aux(&Cinner0->aux[0]);
+    gusto_complete_aux(&Couter0->aux[0]);
+    gusto_to_conserved(&Cinner0->aux[0], Cinner0->U, Cinner0->dA);
+    gusto_to_conserved(&Couter0->aux[0], Couter0->U, Couter0->dA);
+  }
+}
+
+
+
 void bc_inflow_outflow(struct gusto_sim *sim)
 {
   for (int n=0; n<sim->num_rows; ++n) {
@@ -638,12 +730,14 @@ OpBoundaryCon gusto_lookup_boundary_con(const char *user_key)
   const char *keys[] = {
     "none",
     "periodic_longitudinal",
+    "inflow",
     "inflow_outflow",
     NULL
   } ;
   OpBoundaryCon vals[] = {
     bc_none,
     bc_periodic_longitudinal,
+    bc_inflow,
     bc_inflow_outflow,
     NULL } ;
   int n = 0;

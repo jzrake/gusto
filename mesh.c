@@ -5,6 +5,7 @@
 #include "utlist.h"
 #include "gusto.h"
 
+#define STERADIAN (2 * M_PI)
 
 
 void gusto_mesh_report(struct gusto_sim *sim)
@@ -501,9 +502,9 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
 
       if (sim->user.coordinates == 'c' ||
 	  sim->user.coordinates == 's') {
-	C->dA[0] *= C->x[1] * 2 * M_PI;
-	C->dA[1] *= C->x[1] * 2 * M_PI;
-	C->dA[3] *= C->x[1] * 2 * M_PI;
+	C->dA[0] *= C->x[1] * STERADIAN;
+	C->dA[1] *= C->x[1] * STERADIAN;
+	C->dA[3] *= C->x[1] * STERADIAN;
       }
 
       /* Cell's longitudinal axis */
@@ -543,7 +544,7 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
        multiplied by R. */
     if (sim->user.coordinates == 'c' ||
 	sim->user.coordinates == 's') {
-      F->nhat[0] *= x0[1] * 2 * M_PI;
+      F->nhat[0] *= x0[1] * STERADIAN;
     }
 
 
