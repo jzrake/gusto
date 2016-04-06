@@ -222,6 +222,15 @@ void gusto_initial_data(struct gusto_sim *sim)
 void gusto_compute_fluxes(struct gusto_sim *sim)
 {
   struct mesh_face *F;
+  struct mesh_vert *V;
+
+  for (int n=0; n<sim->num_rows; ++n) {
+    DL_FOREACH(sim->rows[n].verts, V) {
+      V->Efield = 0.0;
+      V->num_counts = 0;
+    }
+  }
+
   DL_FOREACH(sim->faces, F) {
 
     struct mesh_cell *CL = F->cells[0];
@@ -240,7 +249,36 @@ void gusto_compute_fluxes(struct gusto_sim *sim)
     else if (CR) {
       gusto_riemann(CR->aux, CR->aux, F->nhat, F->Fhat, vpar);
     }
+
+    /*
+     * Compute electric field at the face endpoints (x0, x1) from the Godunov
+     * flux.
+     *
+     * E3 = -F1(B2) = F2(B1)
+     */
+    double df[4] = {0, 0, 1, 0};
+    double dx[4] = VEC4_CROSS(df, F->nhat); /* unit vector from x0 -> x1 */
+    double ef = dx[1] * F->Fhat[B11] + dx[3] * F->Fhat[B33];
+
+    F->verts[0]->Efield += ef;
+    F->verts[1]->Efield += ef;
+    F->verts[0]->num_counts += 1;
+    F->verts[1]->num_counts += 1;
   }
+
+  for (int n=0; n<sim->num_rows; ++n) {
+    DL_FOREACH(sim->rows[n].verts, V) {
+      V->Efield /= V->num_counts;
+      V->num_counts = 0;
+    }
+  }
+}
+
+
+
+void gusto_transmit_emf(struct gusto_sim *sim, double dt)
+{
+
 }
 
 
@@ -251,9 +289,21 @@ void gusto_transmit_fluxes(struct gusto_sim *sim, double dt)
   DL_FOREACH(sim->faces, F) {
     struct mesh_cell *CL = F->cells[0];
     struct mesh_cell *CR = F->cells[1];
-    for (int q=0; q<8; ++q) {
+
+    for (int q=0; q<5; ++q) {
       if (CL) CL->U[q] -= F->Fhat[q] * F->nhat[0] * dt;
       if (CR) CR->U[q] += F->Fhat[q] * F->nhat[0] * dt;
+    }
+
+    if (sim->user.coordinates == 'c' ||
+	sim->user.coordinates == 's') {
+      double R = F->verts[0]->x[1];
+      if (CL) CL->U[B22] -= F->Fhat[B22] * F->nhat[0]/R * dt;
+      if (CR) CR->U[B22] += F->Fhat[B22] * F->nhat[0]/R * dt;
+    }
+    else {
+      if (CL) CL->U[B22] -= F->Fhat[B22] * F->nhat[0] * dt;
+      if (CR) CR->U[B22] += F->Fhat[B22] * F->nhat[0] * dt;
     }
   }
 }

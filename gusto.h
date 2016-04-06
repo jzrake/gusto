@@ -51,8 +51,10 @@ struct mesh_vert
 {
   double x[4];
   double v[4];
+  double Efield;
   int row_index;
   int col_index;
+  int num_counts;
   struct aux_variables aux[4];
   struct mesh_cell *cell;
   struct mesh_vert *next;
@@ -63,6 +65,7 @@ struct mesh_face
 {
   double Fhat[8]; /* Godunov fluxes */
   double nhat[4]; /* 0: face area, 1,2,3: unit normal */
+  double Bflux;   /* magnetic flux through face */
   struct mesh_vert *verts[2];
   struct mesh_cell *cells[2];
   struct mesh_face *next;
