@@ -73,16 +73,23 @@ const char **initial_data_density_wave(struct gusto_user *user,
 {
   if (A == NULL) {
     static const char *help[] = { "-- Density wave --",
+				  "pressure0: ambient gas pressure",
+				  "density0: ambient density",
+				  "density1: density perturbation",
+				  "fourvel0: four velocity in the R direction",
+				  "fourvel1: four velocity in the z direction",
 				  NULL };
     return help;
   }
   double k = 2 * M_PI;
+  double R = X[1];
   double z = X[3];
-  double d = 1.0 + 0.01 * sin(k * z);
+  double d = user->density0 + user->density1 * sin(k * z + k * R);
 
-  A->velocity_four_vector[3] = 1.0;
+  A->velocity_four_vector[1] = user->fourvel0;
+  A->velocity_four_vector[3] = user->fourvel1;
   A->comoving_mass_density = d;
-  A->gas_pressure = 1.0;
+  A->gas_pressure = user->pressure0;
 
   return NULL;
 }
@@ -727,7 +734,8 @@ void bc_none(struct gusto_sim *sim)
 
 void bc_periodic_longitudinal(struct gusto_sim *sim)
 {
-  /* Assumes we have exactly one guard zone in the longitudinal direction. */
+  /* Assumes we have exactly one guard zone in the longitudinal direction. Does
+     nothing to the transverse direction. */
   for (int n=0; n<sim->num_rows; ++n) {
     struct mesh_cell *Cinner_bc = sim->rows[n].cells;
     struct mesh_cell *Couter_bc = sim->rows[n].cells;
@@ -743,6 +751,42 @@ void bc_periodic_longitudinal(struct gusto_sim *sim)
     gusto_to_conserved(&Cinner_bc->aux[0], Cinner_bc->U, Cinner_bc->dA);
     gusto_to_conserved(&Couter_bc->aux[0], Couter_bc->U, Couter_bc->dA);
   }
+}
+
+
+
+void bc_periodic_all(struct gusto_sim *sim)
+{
+  /* Assumes we have exactly one guard row in the transverse direction. The
+     guard rows must have the same length and vertex locations as their interior
+     row counterpart on the other side of the domain. */
+
+  struct mesh_cell *CL_bc; /* |+| | | | | | | */
+  struct mesh_cell *CL_in; /* | |+| | | | | | */
+  struct mesh_cell *CR_in; /* | | | | | |+| | */
+  struct mesh_cell *CR_bc; /* | | | | | | |+| */
+
+  int N = sim->num_rows;
+  CL_bc = sim->rows[  0].cells;
+  CL_in = sim->rows[  1].cells;
+  CR_in = sim->rows[N-2].cells;
+  CR_bc = sim->rows[N-1].cells;
+
+  while (CL_bc && CL_in && CR_in && CR_bc) {
+
+    CL_bc->aux[0] = CR_in->aux[0];
+    CR_bc->aux[0] = CL_in->aux[0];
+
+    gusto_to_conserved(&CL_bc->aux[0], CL_bc->U, CL_bc->dA);
+    gusto_to_conserved(&CR_bc->aux[0], CR_bc->U, CR_bc->dA);
+
+    CL_bc = CL_bc->next;
+    CL_in = CL_in->next;
+    CR_in = CR_in->next;
+    CR_bc = CR_bc->next;
+  }
+
+  bc_periodic_longitudinal(sim);
 }
 
 
@@ -796,6 +840,7 @@ OpBoundaryCon gusto_lookup_boundary_con(const char *user_key)
   const char *keys[] = {
     "none",
     "periodic_longitudinal",
+    "periodic_all",
     "inflow",
     "inflow_outflow",
     NULL
@@ -803,6 +848,7 @@ OpBoundaryCon gusto_lookup_boundary_con(const char *user_key)
   OpBoundaryCon vals[] = {
     bc_none,
     bc_periodic_longitudinal,
+    bc_periodic_all,
     bc_inflow,
     bc_inflow_outflow,
     NULL } ;
