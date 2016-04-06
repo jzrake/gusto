@@ -39,6 +39,23 @@ int gusto_is_valid(struct gusto_sim *sim)
 }
 
 
+void gusto_print_help(struct gusto_sim *sim)
+{
+  const char **help_lines = NULL;
+  if (sim->initial_data) {
+    help_lines = sim->initial_data(&sim->user, NULL, NULL);
+  }
+  if (help_lines) {
+    int n = 0;
+    printf("\n");
+    while (help_lines[n]) {
+      printf("\t%s\n", help_lines[n]);
+      n += 1;
+    }
+    printf("\n");
+  }
+}
+
 
 /*
  * Main function
@@ -72,6 +89,7 @@ int main(int argc, char **argv)
 
   gusto_user_report(&sim.user);
   gusto_config_from_user(&sim);
+  gusto_print_help(&sim);
 
   if (!gusto_is_valid(&sim)) {
     printf("[gusto] ERROR: invalid setup\n");

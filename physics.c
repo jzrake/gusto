@@ -9,9 +9,15 @@
 
 
 
-void initial_data_cylindrical_shock(struct gusto_user *user,
-				    struct aux_variables *A, double *X)
+const char **initial_data_cylindrical_shock(struct gusto_user *user,
+					    struct aux_variables *A, double *X)
 {
+  if (A == NULL) {
+    static const char *help[] = { "-- Cylindrical shock wave --",
+				  NULL };
+    return help;
+  }
+
   double x = X[1] - 0.5;
   double y = X[3] - 0.5;
   if (sqrt(x*x + y*y) < 0.125) {
@@ -22,13 +28,20 @@ void initial_data_cylindrical_shock(struct gusto_user *user,
     A->comoving_mass_density = 0.1;
     A->gas_pressure = 0.125;
   }
+
+  return NULL;
 }
 
 
 
-void initial_data_sound_wave(struct gusto_user *user,
-			     struct aux_variables *A, double *X)
+const char ** initial_data_sound_wave(struct gusto_user *user,
+				      struct aux_variables *A, double *X)
 {
+  if (A == NULL) {
+    static const char *help[] = { "-- Sound wave --",
+				  NULL };
+    return help;
+  }
   double k = 2 * M_PI;
   double z = X[3];
 
@@ -49,13 +62,20 @@ void initial_data_sound_wave(struct gusto_user *user,
   A->velocity_four_vector[3] = u;
   A->comoving_mass_density = d;
   A->gas_pressure = p;
+
+  return NULL;
 }
 
 
 
-void initial_data_density_wave(struct gusto_user *user,
-			       struct aux_variables *A, double *X)
+const char **initial_data_density_wave(struct gusto_user *user,
+				       struct aux_variables *A, double *X)
 {
+  if (A == NULL) {
+    static const char *help[] = { "-- Density wave --",
+				  NULL };
+    return help;
+  }
   double k = 2 * M_PI;
   double z = X[3];
   double d = 1.0 + 0.01 * sin(k * z);
@@ -63,22 +83,45 @@ void initial_data_density_wave(struct gusto_user *user,
   A->velocity_four_vector[3] = 1.0;
   A->comoving_mass_density = d;
   A->gas_pressure = 1.0;
+
+  return NULL;
 }
 
 
 
-void initial_data_uniform(struct gusto_user *user,
-			  struct aux_variables *A, double *X)
+const char **initial_data_uniform(struct gusto_user *user,
+				  struct aux_variables *A, double *X)
 {
+  if (A == NULL) {
+    static const char *help[] = { "-- Uniform initial data --",
+				  "density1: uniform density",
+				  "pressure1: uniform pressure",
+				  NULL };
+    return help;
+  }
+
   A->comoving_mass_density = user->density1;
   A->gas_pressure = user->pressure1;
+
+  return NULL;
 }
 
 
 
-void initial_data_michel69(struct gusto_user *user,
-			   struct aux_variables *A, double *X)
+const char **initial_data_michel69(struct gusto_user *user,
+				   struct aux_variables *A, double *X)
 {
+  if (A == NULL) {
+    static const char *help[] =
+      {"-- Michel 1969 cold MHD wind --",
+       "Use with spherical coordinate source terms and radial mesh if in 1D.",
+       "",
+       "entropy: uniform entropy (choose something small)",
+       "sigma: magnetization, ratio of r0 to light cylinder radius (squared)",
+       NULL};
+    return help;
+  }
+
   double r = X[1];
   double c = 1.0;
   double Phi = 1.0;
@@ -97,22 +140,13 @@ void initial_data_michel69(struct gusto_user *user,
   double d2 = 1 + sig * x2 * (lam * lam - 2) + sig * x4 * (sig - lam * (2 + lam * sig));
   double d3 = -2 * x2 + 2 * sig * x4;
   double d4 = x4;
-
   double roots[4];
-  double ur;
-  int nr = solve_quartic_equation(d4, d3, d2, d1, d0, roots);
 
-  if (nr != 4) {
+  if (solve_quartic_equation(d4, d3, d2, d1, d0, roots) != 4) {
     printf("[gusto] WARNING: michel69 solution has imaginary roots\n");
   }
 
-  if (x2 < xc2) {
-    ur = roots[1];
-  }
-  else {
-    ur = roots[2];
-  }
-
+  double ur = x2 < xc2 ? roots[1] : roots[2];
   double uf = sqrt(sig * x2) * (1 - lam * ur) / (1 - x2 * (ur + sig));
   double Bf = sqrt(sig * x2) * Br * (x2 * (1 + lam * sig) - lam) / (1 - x2 * (ur + sig));
   double u0 = sqrt(1.0 + ur*ur + uf*uf);
@@ -122,32 +156,16 @@ void initial_data_michel69(struct gusto_user *user,
   double f = Phi * Phi / (4 * M_PI * c * r0 * r0); /* mass rate per steradian */
   double d = f / (r * r * ur);
   double s = user->entropy; /* log(p / rho^Gamma) */
-  double p = exp(s) * pow(d, 4./3);
+  double p = exp(s) * pow(d, gamma_law_index);
 
   A->velocity_four_vector[1] = ur;
   A->velocity_four_vector[2] = uf;
-  A->magnetic_four_vector[1] = br / sqrt(4 * M_PI);
+  A->magnetic_four_vector[1] = br / sqrt(4 * M_PI); /* code units of B field */
   A->magnetic_four_vector[2] = bf / sqrt(4 * M_PI);
   A->comoving_mass_density = d;
   A->gas_pressure = p;
 
-  //printf("p=%e\n", p);
-
-  //printf("s=%f d=%e\n", log(A->gas_pressure / pow(A->comoving_mass_density, 4./3)), A->comoving_mass_density);
-  /* double z = 1.0; */
-  /* double k = Phi / (c * r0 * r0); */
-  /* double dg = A->comoving_mass_density; */
-  /* double bb = br*br + bf*bf - b0*b0; */
-  /* double mu = u0 * z * c * c - r * (c/rL) * Bf / k; */
-  /* double el = uf * z * r - r * Bf / k; */
-  /* double n[4] = {0, 1, 0, 0}; */
-  /* double F[8]; */
-
-  /* A->R = r; */
-  /* gusto_complete_aux(A); */
-  /* gusto_fluxes(A, n, F); */
-
-  //printf("mu=%f el=%f F[TAU]=%f F[S22]=%f F[B22]=%f\n", mu, el, r*r*F[TAU], r*r*F[S22], r*F[B22]);
+  return NULL;
 }
 
 

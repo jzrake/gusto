@@ -18,8 +18,8 @@ struct mesh_cell;
 
 typedef void (*OpBoundaryCon)(struct gusto_sim *sim);
 typedef void (*OpInitialMesh)(struct gusto_user *user, struct mesh_vert *V);
-typedef void (*OpInitialData)(struct gusto_user *user,
-			      struct aux_variables *A, double *X);
+typedef const char **(*OpInitialData)(struct gusto_user *user,
+				      struct aux_variables *A, double *X);
 
 
 struct gusto_sim
