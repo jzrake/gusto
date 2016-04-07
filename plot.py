@@ -32,7 +32,7 @@ def triangle_variable_plot(filename):
     dset = gusto_dataset.GustoDataset(filename)
     x = dset.get_cell_variable('x1')
     z = dset.get_cell_variable('x3')
-    f = dset.get_cell_variable('dg')
+    f = dset.get_cell_variable('b1')
     plt.tripcolor(x, z, f)
     plt.axis('equal')
 

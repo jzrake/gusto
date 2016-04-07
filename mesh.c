@@ -467,6 +467,7 @@ void gusto_mesh_generate_faces(struct gusto_sim *sim)
 
 void gusto_mesh_compute_geometry(struct gusto_sim *sim)
 {
+  struct mesh_vert *V;
   struct mesh_cell *C;
   struct mesh_face *F;
 
@@ -477,6 +478,21 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
    * ---------------------------------------------------------------------------
    */
   for (int n=0; n<sim->num_rows; ++n) {
+
+    /*
+     * Update the R term of the vertex aux data.
+     */
+    DL_FOREACH(sim->rows[n].verts, V) {
+      if (sim->user.coordinates == 'c' ||
+	  sim->user.coordinates == 's') {
+	V->aux[0].R = V->x[1];
+      }
+      else {
+	V->aux[0].R = 1.0;
+      }
+    }
+
+
     DL_FOREACH(sim->rows[n].cells, C) {
 
       /*
@@ -506,14 +522,18 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
 	C->dA[0] *= C->x[1] * STERADIAN;
 	C->dA[1] *= C->x[1] * STERADIAN;
 	C->dA[3] *= C->x[1] * STERADIAN;
+	C->aux[0].R = C->x[1];
+      }
+      else {
+	C->aux[0].R = 1.0;
       }
 
       /* Cell's longitudinal axis */
-      /* C->zhat[0] = 0.0; */
-      /* C->zhat[1] = 0.5 * (dAz0[1] + dAz1[1]); */
-      /* C->zhat[2] = 0.5 * (dAz0[2] + dAz1[2]); */
-      /* C->zhat[3] = 0.5 * (dAz0[3] + dAz1[3]); */
-      /* VEC4_NORMALIZE(C->zhat); */
+      C->zhat[0] = 0.0;
+      C->zhat[1] = 0.5 * (dAz0[1] + dAz1[1]);
+      C->zhat[2] = 0.5 * (dAz0[2] + dAz1[2]);
+      C->zhat[3] = 0.5 * (dAz0[3] + dAz1[3]);
+      VEC4_NORMALIZE(C->zhat);
 
 
       double dAR = gusto_min3(VEC4_MOD(dAR0), VEC4_MOD(dAR1), 1.0);
@@ -568,18 +588,6 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
       F->nhat[1] *= -1;
       F->nhat[2] *= -1;
       F->nhat[3] *= -1;
-    }
-
-
-
-    /* This is a self-consistency check. It should be guaranteed by the previous
-       lines. */
-    if (F->cells[0] && F->cells[1]) {
-      double dL[4] = VEC4_SUB(F->cells[1]->x, F->cells[0]->x);
-      double aligned = VEC4_DOT(dL, F->nhat);
-      if (aligned < 0) {
-	printf("[gusto] ERROR: a face is on backwards\n");
-      }
     }
   }
 }

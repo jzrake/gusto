@@ -39,12 +39,13 @@ struct aux_variables
 {
   double velocity_four_vector[4];
   double magnetic_four_vector[4];
-  double momentum_density[4]; /* T^{0,:} */
+  double momentum_density[4];
   double comoving_mass_density;
   double gas_pressure;
   double magnetic_pressure;
-  double enthalpy_density;
-  double R; /* factor for cylindrical coordinates */
+  double enthalpy_density; /* includes magnetic part: h + b^2 */
+  double electric_field;   /* out-of-plane E field or vector potential */
+  double R;                /* factor for cylindrical coordinates */
 } ;
 
 struct mesh_vert
@@ -77,8 +78,10 @@ struct mesh_cell
 {
   double x[4];
   double dA[4];                /* 0: volume, dA1, dA2, dA3: cross-sections */
-  //double zhat[4];              /* 1,2,3: cell's longitudinal axis (unit) */
+  double zhat[4];              /* 1,2,3: cell's longitudinal axis (unit) */
   double U[8];                 /* total mass, energy, momentum, magnetic flux */
+  double weightA;
+  double weightB;
   struct mesh_vert *verts[4];
   struct aux_variables aux[5]; /* aux vars at different cell locations */
   struct mesh_cell *next;
@@ -121,6 +124,7 @@ void gusto_mesh_advance_vertices(struct gusto_sim *sim, double dt);
 void gusto_riemann(struct aux_variables *AL, struct aux_variables *AR,
 		   double nhat[4], double Fhat[8], double s);
 void gusto_to_conserved(struct aux_variables *A, double U[8], double dA[4]);
+void gusto_default_aux(struct aux_variables *A);
 void gusto_complete_aux(struct aux_variables *A);
 void gusto_cylindrical_source_terms(struct aux_variables *A, double Udot[8]);
 void gusto_spherical_source_terms(struct aux_variables *A, double Udot[8]);
@@ -134,10 +138,11 @@ int gusto_fluxes(struct aux_variables *A, double n[4], double F[8]);
 void gusto_recover_variables(struct gusto_sim *sim);
 void gusto_initial_data(struct gusto_sim *sim);
 void gusto_compute_vertex_velocities(struct gusto_sim *sim);
-void gusto_enforce_boundary_condition(struct gusto_sim *sim);
 void gusto_compute_variables_at_vertices(struct gusto_sim *sim);
 void gusto_compute_fluxes(struct gusto_sim *sim);
+void gusto_compute_cell_magnetic_field(struct gusto_sim *sim);
 void gusto_transmit_fluxes(struct gusto_sim *sim, double dt);
+void gusto_transmit_emf(struct gusto_sim *sim, double dt);
 void gusto_add_source_terms(struct gusto_sim *sim, double dt);
 
 
@@ -146,6 +151,7 @@ void gusto_free(struct gusto_sim *sim);
 void gusto_config_from_user(struct gusto_sim *sim);
 void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname);
 int gusto_is_valid(struct gusto_sim *sim);
+
 
 
 OpBoundaryCon gusto_lookup_boundary_con(const char *user_key);

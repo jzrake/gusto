@@ -9,6 +9,25 @@
 
 
 
+const char **initial_data_uniform(struct gusto_user *user,
+				  struct aux_variables *A, double *X)
+{
+  if (A == NULL) {
+    static const char *help[] = { "-- Uniform initial data --",
+				  "density1: uniform density",
+				  "pressure1: uniform pressure",
+				  NULL };
+    return help;
+  }
+
+  A->comoving_mass_density = user->density1;
+  A->gas_pressure = user->pressure1;
+
+  return NULL;
+}
+
+
+
 const char **initial_data_cylindrical_shock(struct gusto_user *user,
 					    struct aux_variables *A, double *X)
 {
@@ -96,19 +115,16 @@ const char **initial_data_density_wave(struct gusto_user *user,
 
 
 
-const char **initial_data_uniform(struct gusto_user *user,
-				  struct aux_variables *A, double *X)
+const char **initial_data_abc_field(struct gusto_user *user,
+				    struct aux_variables *A, double *X)
 {
   if (A == NULL) {
-    static const char *help[] = { "-- Uniform initial data --",
-				  "density1: uniform density",
-				  "pressure1: uniform pressure",
+    static const char *help[] = { "-- ABC magnetic field --",
 				  NULL };
     return help;
   }
 
-  A->comoving_mass_density = user->density1;
-  A->gas_pressure = user->pressure1;
+  A->electric_field = cos(X[1] * 2 * M_PI) - sin(X[3] * 2 * M_PI);
 
   return NULL;
 }
@@ -183,6 +199,7 @@ OpInitialData gusto_lookup_initial_data(const char *user_key)
     "uniform",
     "cylindrical_shock",
     "density_wave",
+    "abc_field",
     "michel69",
     NULL
   } ;
@@ -190,6 +207,7 @@ OpInitialData gusto_lookup_initial_data(const char *user_key)
     initial_data_uniform,
     initial_data_cylindrical_shock,
     initial_data_density_wave,
+    initial_data_abc_field,
     initial_data_michel69,
     NULL } ;
   int n = 0;
@@ -216,34 +234,71 @@ OpInitialData gusto_lookup_initial_data(const char *user_key)
 
 void gusto_initial_data(struct gusto_sim *sim)
 {
+  struct mesh_vert *V;
   struct mesh_cell *C;
+  struct mesh_face *F;
+  struct aux_variables *A;
+
   for (int n=0; n<sim->num_rows; ++n) {
+
+    /* Vertex initial data is only used to get the vector potential. We don't
+       need a completed set of aux variables there. */
+    DL_FOREACH(sim->rows[n].verts, V) {
+      A = &V->aux[0];
+      gusto_default_aux(A);
+      sim->initial_data(&sim->user, A, V->x);
+    }
+
+    /* Cell initial data is used to get everything else. The aux variables are
+       then completed so we can use them after differencing the vector potential
+       to get the magnetic field at the cell centers. */
     DL_FOREACH(sim->rows[n].cells, C) {
-
-      struct aux_variables *A = &C->aux[0];
-
-      /* some defaults */
-      A->comoving_mass_density = 1;
-      A->gas_pressure = 1;
-      A->velocity_four_vector[1] = 0.0;
-      A->velocity_four_vector[2] = 0.0;
-      A->velocity_four_vector[3] = 0.0;
-      A->magnetic_four_vector[1] = 0.0;
-      A->magnetic_four_vector[2] = 0.0;
-      A->magnetic_four_vector[3] = 0.0;
-
-      if (sim->user.coordinates == 'c' ||
-	  sim->user.coordinates == 's') {
-	A->R = C->x[1];
-      }
-      else {
-	A->R = 1.0;
-      }
-
+      A = &C->aux[0];
+      gusto_default_aux(A);
       sim->initial_data(&sim->user, A, C->x);
-
       gusto_complete_aux(A);
       gusto_to_conserved(A, C->U, C->dA);
+    }
+  }
+
+
+  if (0) {
+    /* Here, we set the magnetic flux on faces to zero, then use the
+       transmit_emf function to get their magnetic flux from the vertex vector
+       potential. */
+    DL_FOREACH(sim->faces, F) {
+      F->Bflux = 0.0;
+    }
+    gusto_transmit_emf(sim, 1.0);
+
+
+    /* This operation averages the magnetic flux on faces to get the point-wise
+       field at the cell center. The field values are converted to a magnetic
+       four vector and placed in the cell's aux variables.
+
+       OR (not sure which yet) ...
+
+       they are left in the cell's U[B11] and U[B33] data. Note these are not
+       fluxes, but fields --- while U[B22] is a magnetic flux, through the
+       cell's meridional cross-section. */
+    gusto_compute_cell_magnetic_field(sim);
+
+
+    for (int n=0; n<sim->num_rows; ++n) {
+      DL_FOREACH(sim->rows[n].cells, C) {
+	A = &C->aux[0];
+	double b0 = A->magnetic_four_vector[0];
+	double u0 = A->velocity_four_vector[0];
+	double u1 = A->velocity_four_vector[1];
+	double u3 = A->velocity_four_vector[3];
+	double b1 = (C->U[B11] + b0 * u1) / u0;
+	double b3 = (C->U[B33] + b0 * u3) / u0;
+
+	A->magnetic_four_vector[1] = b1;
+	A->magnetic_four_vector[3] = b3;
+	gusto_complete_aux(A);
+	gusto_to_conserved(A, C->U, C->dA);
+      }
     }
   }
 }
@@ -307,9 +362,47 @@ void gusto_compute_fluxes(struct gusto_sim *sim)
 
 
 
-void gusto_transmit_emf(struct gusto_sim *sim, double dt)
+void gusto_compute_cell_magnetic_field(struct gusto_sim *sim)
 {
+  struct mesh_cell *C;
+  struct mesh_face *F;
 
+  for (int n=0; n<sim->num_rows; ++n) {
+    DL_FOREACH(sim->rows[n].cells, C) {
+      C->weightA = 0.0;
+      C->weightB = 0.0;
+      C->U[B11] = 0.0;
+      C->U[B33] = 0.0;
+    }
+  }
+
+  DL_FOREACH(sim->faces, F) {
+
+    double nhat_dot_B = F->Bflux / F->nhat[0];
+
+    if (F->cells[0]) {
+      F->cells[0]->U[B11] += nhat_dot_B * F->nhat[1];
+      F->cells[0]->U[B33] += nhat_dot_B * F->nhat[3];
+      F->cells[0]->weightA += F->nhat[1];
+      F->cells[0]->weightB += F->nhat[3];
+    }
+
+    if (F->cells[1]) {
+      F->cells[1]->U[B11] += nhat_dot_B * F->nhat[1];
+      F->cells[1]->U[B33] += nhat_dot_B * F->nhat[3];
+      F->cells[1]->weightA += F->nhat[1];
+      F->cells[1]->weightB += F->nhat[3];
+    }
+  }
+
+  for (int n=0; n<sim->num_rows; ++n) {
+    DL_FOREACH(sim->rows[n].cells, C) {
+      C->U[B11] /= C->weightA;
+      C->U[B33] /= C->weightB;
+      C->weightA = 0.0;
+      C->weightB = 0.0;
+    }
+  }
 }
 
 
@@ -317,6 +410,7 @@ void gusto_transmit_emf(struct gusto_sim *sim, double dt)
 void gusto_transmit_fluxes(struct gusto_sim *sim, double dt)
 {
   struct mesh_face *F;
+
   DL_FOREACH(sim->faces, F) {
     struct mesh_cell *CL = F->cells[0];
     struct mesh_cell *CR = F->cells[1];
@@ -328,6 +422,29 @@ void gusto_transmit_fluxes(struct gusto_sim *sim, double dt)
 
     if (CL) CL->U[B22] -= F->Fhat[B22] * F->length * dt;
     if (CR) CR->U[B22] += F->Fhat[B22] * F->length * dt;
+  }
+}
+
+
+
+void gusto_transmit_emf(struct gusto_sim *sim, double dt)
+{
+  struct mesh_face *F;
+
+  DL_FOREACH(sim->faces, F) {
+
+    double Ef0 = F->verts[0]->aux[0].electric_field;
+    double Ef1 = F->verts[1]->aux[0].electric_field;
+    double dl0 = F->verts[0]->aux[0].R;
+    double dl1 = F->verts[1]->aux[0].R;
+
+    if (sim->user.coordinates == 'c' ||
+	sim->user.coordinates == 's') {
+      dl0 *= 2 * M_PI;
+      dl1 *= 2 * M_PI;
+    }
+
+    F->Bflux += (Ef0 * dl0 - Ef1 * dl1) * dt;
   }
 }
 
@@ -411,6 +528,21 @@ void gusto_compute_variables_at_vertices(struct gusto_sim *sim)
       gusto_complete_aux(&V->aux[0]);
     }
   }
+}
+
+
+
+void gusto_default_aux(struct aux_variables *A)
+{
+  A->comoving_mass_density = 1.0;
+  A->gas_pressure = 1.0;
+  A->electric_field = 0.0;
+  A->velocity_four_vector[1] = 0.0;
+  A->velocity_four_vector[2] = 0.0;
+  A->velocity_four_vector[3] = 0.0;
+  A->magnetic_four_vector[1] = 0.0;
+  A->magnetic_four_vector[2] = 0.0;
+  A->magnetic_four_vector[3] = 0.0;
 }
 
 
