@@ -124,7 +124,12 @@ const char **initial_data_abc_field(struct gusto_user *user,
     return help;
   }
 
-  A->electric_field = cos(X[1] * 2 * M_PI) - sin(X[3] * 2 * M_PI);
+  double al = 2 * M_PI;
+  double Af = cos(X[1] * al) - sin(X[3] * al);
+  double Bf = -Af * al;
+
+  A->electric_field = Af;
+  A->magnetic_four_vector[2] = Bf;
 
   return NULL;
 }
@@ -273,14 +278,9 @@ void gusto_initial_data(struct gusto_sim *sim)
 
 
     /* This operation averages the magnetic flux on faces to get the point-wise
-       field at the cell center. The field values are converted to a magnetic
-       four vector and placed in the cell's aux variables.
-
-       OR (not sure which yet) ...
-
-       they are left in the cell's U[B11] and U[B33] data. Note these are not
-       fluxes, but fields --- while U[B22] is a magnetic flux, through the
-       cell's meridional cross-section. */
+       field at the cell center. The field values are stored in the cell's
+       U[B11] and U[B33] data. Note these are magnetic fluxes, the field vlaue
+       miltipled by the cell's cross-section in that direction. */
     gusto_compute_cell_magnetic_field(sim);
 
 
@@ -291,8 +291,10 @@ void gusto_initial_data(struct gusto_sim *sim)
 	double u0 = A->velocity_four_vector[0];
 	double u1 = A->velocity_four_vector[1];
 	double u3 = A->velocity_four_vector[3];
-	double b1 = (C->U[B11] + b0 * u1) / u0;
-	double b3 = (C->U[B33] + b0 * u3) / u0;
+	double B1 = C->U[B11] / C->dA[1];
+	double B3 = C->U[B33] / C->dA[3];
+	double b1 = (B1 + b0 * u1) / u0;
+	double b3 = (B3 + b0 * u3) / u0;
 
 	A->magnetic_four_vector[1] = b1;
 	A->magnetic_four_vector[3] = b3;
@@ -399,8 +401,8 @@ void gusto_compute_cell_magnetic_field(struct gusto_sim *sim)
 
   for (int n=0; n<sim->num_rows; ++n) {
     DL_FOREACH(sim->rows[n].cells, C) {
-      C->U[B11] /= C->weightA;
-      C->U[B33] /= C->weightB;
+      if (fabs(C->weightA) > 1e-12) C->U[B11] *= C->dA[1] / C->weightA;
+      if (fabs(C->weightB) > 1e-12) C->U[B33] *= C->dA[3] / C->weightB;
       C->weightA = 0.0;
       C->weightB = 0.0;
     }
