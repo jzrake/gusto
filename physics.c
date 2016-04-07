@@ -340,10 +340,12 @@ void gusto_compute_fluxes(struct gusto_sim *sim)
      * Compute electric field at the face endpoints (x0, x1) from the Godunov
      * flux.
      *
-     * E3 = -F1(B2) = F2(B1)
+     * E2 = -F3(B1) = F1(B3) = F.n[B.dx] = Fhat[B1] dx1 + Fhat[B3] dx3
+     *
+     * where dx is the unit vector from x0 -> x1.
      */
     double df[4] = {0, 0, 1, 0};
-    double dx[4] = VEC4_CROSS(df, F->nhat); /* unit vector from x0 -> x1 */
+    double dx[4] = VEC4_CROSS(F->nhat, df); /* unit vector from x0 -> x1 */
     double ef = dx[1] * F->Fhat[B11] + dx[3] * F->Fhat[B33];
 
     F->verts[0]->Efield += ef;
