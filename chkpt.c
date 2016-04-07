@@ -91,6 +91,19 @@ void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname)
       WRITE_VARIABLE_CELL(aux[0].comoving_mass_density, "dg");
       WRITE_VARIABLE_CELL(aux[0].gas_pressure, "pg");
 
+      WRITE_VARIABLE_CELL(verts[0]->x[1], "v0.x1");
+      WRITE_VARIABLE_CELL(verts[0]->x[2], "v0.x2");
+      WRITE_VARIABLE_CELL(verts[0]->x[3], "v0.x3");
+      WRITE_VARIABLE_CELL(verts[1]->x[2], "v1.x2");
+      WRITE_VARIABLE_CELL(verts[1]->x[3], "v1.x3");
+      WRITE_VARIABLE_CELL(verts[1]->x[1], "v1.x1");
+      WRITE_VARIABLE_CELL(verts[2]->x[3], "v2.x3");
+      WRITE_VARIABLE_CELL(verts[2]->x[1], "v2.x1");
+      WRITE_VARIABLE_CELL(verts[2]->x[2], "v2.x2");
+      WRITE_VARIABLE_CELL(verts[3]->x[1], "v3.x1");
+      WRITE_VARIABLE_CELL(verts[3]->x[2], "v3.x2");
+      WRITE_VARIABLE_CELL(verts[3]->x[3], "v3.x3");
+
       free(data);
       H5Sclose(spc);
     }
