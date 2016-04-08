@@ -58,7 +58,6 @@ class GustoDataset(object):
 
     def get_cell_polygons(self):
         polygons = [ ]
-
         for row in self.h5f['rows'].itervalues():
             cells = row['cells']
             v0_x1 = cells['v0.x1'][:]
@@ -73,12 +72,9 @@ class GustoDataset(object):
             v3_x1 = cells['v3.x1'][:]
             v3_x2 = cells['v3.x2'][:]
             v3_x3 = cells['v3.x3'][:]
-
-            for i in range(len(v0_x1)):
-                v0 = [v0_x1[i], v0_x3[i]]
-                v1 = [v1_x1[i], v1_x3[i]]
-                v2 = [v2_x1[i], v2_x3[i]]
-                v3 = [v3_x1[i], v3_x3[i]]
-                polygons.append([v0, v1, v3, v2])
-
+            v0 = zip(v0_x1, v0_x3)
+            v1 = zip(v1_x1, v1_x3)
+            v2 = zip(v2_x1, v2_x3)
+            v3 = zip(v3_x1, v3_x3)
+            polygons += list(zip(v0, v1, v3, v2))
         return np.array(polygons)

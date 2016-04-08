@@ -26,6 +26,7 @@ user_struct = [
     ('fourvel1', 'double', 1.0),
     ('sigma', 'double', 1.0),
     ('entropy', 'double', 1.0),
+    ('curl_mode', 'char', '+'),
 ]
 
 

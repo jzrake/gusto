@@ -107,6 +107,9 @@ double gusto_stop_clock(void *clock_s);
 double gusto_quad_area_centroid(double x0[4],
 				double x1[4], double x2[4],
 				double x3[4], double x4[4]);
+void gusto_curlA1(struct mesh_cell *C, int i0, int i1, int i2,
+		  double crlA[2]);
+void gusto_curlA2(struct mesh_cell *C, double crlA[2]);
 
 /* Mesh operations */
 int gusto_mesh_count(struct gusto_sim *sim, char which, int n);

@@ -8,7 +8,7 @@ import gusto_dataset
 global_vars = dict(num_files=0, file_index=0)
 
 
-def plot_faces(filename):
+def plot_faces(filename, args):
     dset = gusto_dataset.GustoDataset(filename)
     segments = dset.get_face_segments()
     for seg in segments:
@@ -17,7 +17,7 @@ def plot_faces(filename):
     plt.margins(0.1)
 
 
-def plot_1d(filename):
+def plot_1d(filename, args):
     dset = gusto_dataset.GustoDataset(filename)
     x = dset.get_cell_variable('x1')
     y = dset.get_cell_variable('u1')
@@ -29,17 +29,17 @@ def plot_1d(filename):
     plt.plot(x, y, '-', c=[c]*3)
 
 
-def triangle_variable_plot(filename):
+def triangle_variable_plot(filename, args):
     dset = gusto_dataset.GustoDataset(filename)
     x = dset.get_cell_variable('x1')
     z = dset.get_cell_variable('x3')
-    f = dset.get_cell_variable('b2')
+    f = dset.get_cell_variable('dg')
     plt.tripcolor(x, z, f)
     plt.axis('equal')
     plt.colorbar()
 
 
-def triangle_mesh_plot(filename):
+def triangle_mesh_plot(filename, args):
     dset = gusto_dataset.GustoDataset(filename)
     x = dset.get_cell_variable('x1')
     z = dset.get_cell_variable('x3')
@@ -47,21 +47,18 @@ def triangle_mesh_plot(filename):
     plt.axis('equal')
 
 
-def mesh_plot(filename):
+def mesh_plot(filename, args):
     from matplotlib.collections import PolyCollection
-    from matplotlib import cm
-    cmap = cm.get_cmap('jet')
-    scal = cm.ScalarMappable(cmap=cmap)
     dset = gusto_dataset.GustoDataset(filename)
     vert = dset.get_cell_polygons()
-    data = dset.get_cell_variable('dg')
-    colors =  scal.to_rgba(data)
-    cells = PolyCollection(vert, linewidths=0.0, facecolors=colors)
+    data = dset.get_cell_variable(args.data)
+    cells = PolyCollection(vert, array=data, cmap=args.cmap, linewidths=0.0)
     fig = plt.figure()
     ax0 = fig.add_subplot(1, 1, 1)
     ax0.add_collection(cells)
     ax0.autoscale_view()
     ax0.set_aspect('equal')
+    fig.colorbar(cells)
     plt.show()
 
 
@@ -69,6 +66,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('command')
     parser.add_argument('filenames', nargs='+')
+    parser.add_argument('-d', '--data', default='dg')
+    parser.add_argument('--cmap', default='jet')
 
     args = parser.parse_args()
 
@@ -81,5 +80,5 @@ if __name__ == "__main__":
     global_vars['num_files'] = len(args.filenames)
     for n, f in enumerate(args.filenames):
         global_vars['file_index'] = n
-        plots[args.command](f)
+        plots[args.command](f, args)
     plt.show()

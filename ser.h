@@ -22,6 +22,7 @@ struct gusto_user {
     double fourvel1;
     double sigma;
     double entropy;
+    char curl_mode;
 };
 
 

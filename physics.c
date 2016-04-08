@@ -360,33 +360,6 @@ void gusto_compute_fluxes(struct gusto_sim *sim)
 
 
 
-static void estimate_curlA(struct mesh_cell *C, int i0, int i1, int i2,
-			   double crlA[2])
-{
-  double A0 = C->verts[i0]->aux[0].vector_potential;
-  double A1 = C->verts[i1]->aux[0].vector_potential;
-  double A2 = C->verts[i2]->aux[0].vector_potential;
-
-  double x0[2] = {C->verts[i0]->x[1], C->verts[i0]->x[3]};
-  double x1[2] = {C->verts[i1]->x[1], C->verts[i1]->x[3]};
-  double x2[2] = {C->verts[i2]->x[1], C->verts[i2]->x[3]};
-
-  double n[2][2] = { {x1[0] - x0[0], x1[1] - x0[1]},
-		     {x2[0] - x0[0], x2[1] - x0[1]} };
-  double det = n[0][0] * n[1][1] - n[0][1] * n[1][0];
-  double m[2][2] = { {+n[1][1]/det, -n[0][1]/det},
-		     {-n[1][0]/det, +n[0][0]/det} }; /* inverse of n */
-
-  double delA[2] = {A1 - A0, A2 - A0};
-  double grdA[2] = {m[0][0] * delA[0] + m[0][1] * delA[1],
-		    m[1][0] * delA[0] + m[1][1] * delA[1]}; /* (dR A, dz A) */
-
-  crlA[0] = -grdA[1];
-  crlA[1] = +grdA[0];
-}
-
-
-
 void gusto_compute_cell_magnetic_field(struct gusto_sim *sim)
 /*
  * Evaluate the poloidal (in-plane) magnetic field at the cell centers from the
@@ -401,19 +374,6 @@ void gusto_compute_cell_magnetic_field(struct gusto_sim *sim)
   for (int n=0; n<sim->num_rows; ++n) {
     DL_FOREACH(sim->rows[n].cells, C) {
 
-      double crlA0[2];
-      double crlA1[2];
-      double crlA2[2];
-      double crlA3[2];
-
-      /* We take the average of four estimates of curlA, one for each vertex. In
-	 principle we could choose from any of the 4-choose-2 = 6 pairs of
-	 vertices. */
-      estimate_curlA(C, 0, 1, 2, crlA0);
-      estimate_curlA(C, 1, 3, 0, crlA1);
-      estimate_curlA(C, 2, 0, 3, crlA2);
-      estimate_curlA(C, 3, 2, 1, crlA3);
-
       /*
        *
        *  1-------3
@@ -423,8 +383,27 @@ void gusto_compute_cell_magnetic_field(struct gusto_sim *sim)
        *
        */
 
-      C->U[B11] = 0.25 * (crlA0[0] + crlA1[0] + crlA2[0] + crlA3[0]) * C->dA[1];
-      C->U[B33] = 0.25 * (crlA0[1] + crlA1[1] + crlA2[1] + crlA3[1]) * C->dA[3];
+      if (sim->user.curl_mode == '+') {
+	/* We take the average of four estimates of curlA, one for each vertex. */
+	double crlA0[2];
+	double crlA1[2];
+	double crlA2[2];
+	double crlA3[2];
+	gusto_curlA1(C, 0, 1, 2, crlA0);
+	gusto_curlA1(C, 1, 3, 0, crlA1);
+	gusto_curlA1(C, 2, 0, 3, crlA2);
+	gusto_curlA1(C, 3, 2, 1, crlA3);
+	C->U[B11] = 0.25 * (crlA0[0] + crlA1[0] + crlA2[0] + crlA3[0]) * C->dA[1];
+	C->U[B33] = 0.25 * (crlA0[1] + crlA1[1] + crlA2[1] + crlA3[1]) * C->dA[3];
+      }
+      else if (sim->user.curl_mode == 'x') {
+	/* We use all four vertices at once to get one estimate at (or near) the
+	   cell center. */
+	double crlA[2];
+	gusto_curlA2(C, crlA);
+	C->U[B11] = crlA[0] * C->dA[1];
+	C->U[B33] = crlA[1] * C->dA[3];
+      }
     }
   }
 }
