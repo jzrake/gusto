@@ -125,18 +125,23 @@ int main(int argc, char **argv)
 
     void *start_cycle = gusto_start_clock();
 
-    gusto_compute_fluxes(&sim);
-    gusto_transmit_fluxes(&sim, dt);
-    gusto_add_source_terms(&sim, dt);
-
     if (sim.user.move_cells) {
       gusto_compute_variables_at_vertices(&sim);
       gusto_compute_vertex_velocities(&sim);
+    }
+
+    gusto_compute_fluxes(&sim);
+    gusto_transmit_fluxes(&sim, dt);
+    gusto_advance_vector_potential(&sim, dt);
+    gusto_add_source_terms(&sim, dt);
+
+    if (sim.user.move_cells) {
       gusto_mesh_advance_vertices(&sim, dt);
       gusto_mesh_generate_faces(&sim);
       gusto_mesh_compute_geometry(&sim);
     }
 
+    gusto_compute_cell_magnetic_field(&sim);
     gusto_recover_variables(&sim);
     sim.boundary_con(&sim);
 

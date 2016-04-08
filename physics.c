@@ -124,12 +124,20 @@ const char **initial_data_abc_field(struct gusto_user *user,
     return help;
   }
 
-  double al = 2 * M_PI;
-  double Af = cos(X[1] * al) - sin(X[3] * al);
-  double Bf = -Af * al;
+  double a = 1.0;
+  double b = 0.0;
+  double c = 1.0;
 
-  A->electric_field = Af;
-  A->magnetic_four_vector[2] = Bf;
+  double al = 2 * M_PI;
+  double B1 = c * cos(X[3] * al) - b * sin(X[2] * al);
+  double B2 = a * cos(X[1] * al) - c * sin(X[3] * al);
+  double B3 = b * cos(X[2] * al) - a * sin(X[1] * al);
+
+  A->magnetic_four_vector[1] = B1;
+  A->magnetic_four_vector[2] = B2;
+  A->magnetic_four_vector[3] = B3;
+
+  A->vector_potential = B2 / al;
 
   return NULL;
 }
@@ -241,7 +249,6 @@ void gusto_initial_data(struct gusto_sim *sim)
 {
   struct mesh_vert *V;
   struct mesh_cell *C;
-  struct mesh_face *F;
   struct aux_variables *A;
 
   for (int n=0; n<sim->num_rows; ++n) {
@@ -267,22 +274,9 @@ void gusto_initial_data(struct gusto_sim *sim)
   }
 
 
-  if (0) {
-    /* Here, we set the magnetic flux on faces to zero, then use the
-       transmit_emf function to get their magnetic flux from the vertex vector
-       potential. */
-    DL_FOREACH(sim->faces, F) {
-      F->Bflux = 0.0;
-    }
-    gusto_transmit_emf(sim, 1.0);
+  if (1) {
 
-
-    /* This operation averages the magnetic flux on faces to get the point-wise
-       field at the cell center. The field values are stored in the cell's
-       U[B11] and U[B33] data. Note these are magnetic fluxes, the field vlaue
-       miltipled by the cell's cross-section in that direction. */
     gusto_compute_cell_magnetic_field(sim);
-
 
     for (int n=0; n<sim->num_rows; ++n) {
       DL_FOREACH(sim->rows[n].cells, C) {
@@ -366,45 +360,71 @@ void gusto_compute_fluxes(struct gusto_sim *sim)
 
 
 
+static void estimate_curlA(struct mesh_cell *C, int i0, int i1, int i2,
+			   double crlA[2])
+{
+  double A0 = C->verts[i0]->aux[0].vector_potential;
+  double A1 = C->verts[i1]->aux[0].vector_potential;
+  double A2 = C->verts[i2]->aux[0].vector_potential;
+
+  double x0[2] = {C->verts[i0]->x[1], C->verts[i0]->x[3]};
+  double x1[2] = {C->verts[i1]->x[1], C->verts[i1]->x[3]};
+  double x2[2] = {C->verts[i2]->x[1], C->verts[i2]->x[3]};
+
+  double n[2][2] = { {x1[0] - x0[0], x1[1] - x0[1]},
+		     {x2[0] - x0[0], x2[1] - x0[1]} };
+  double det = n[0][0] * n[1][1] - n[0][1] * n[1][0];
+  double m[2][2] = { {+n[1][1]/det, -n[0][1]/det},
+		     {-n[1][0]/det, +n[0][0]/det} }; /* inverse of n */
+
+  double delA[2] = {A1 - A0, A2 - A0};
+  double grdA[2] = {m[0][0] * delA[0] + m[0][1] * delA[1],
+		    m[1][0] * delA[0] + m[1][1] * delA[1]}; /* (dR A, dz A) */
+
+  crlA[0] = -grdA[1];
+  crlA[1] = +grdA[0];
+}
+
+
+
 void gusto_compute_cell_magnetic_field(struct gusto_sim *sim)
+/*
+ * Evaluate the poloidal (in-plane) magnetic field at the cell centers from the
+ * toroidal vector potential A.phi stored at cell vertices. The operation leaves
+ * the result in U[B11] and U[B33], which are magnetic fluxes, being multiplied
+ * by the nominal cell cross-sections dA[1] and dA[3] to be consistent with the
+ * convention used for the toroidal (out-of-plane) field.
+ */
 {
   struct mesh_cell *C;
-  struct mesh_face *F;
 
   for (int n=0; n<sim->num_rows; ++n) {
     DL_FOREACH(sim->rows[n].cells, C) {
-      C->weightA = 0.0;
-      C->weightB = 0.0;
-      C->U[B11] = 0.0;
-      C->U[B33] = 0.0;
-    }
-  }
 
-  DL_FOREACH(sim->faces, F) {
+      double crlA0[2];
+      double crlA1[2];
+      double crlA2[2];
+      double crlA3[2];
 
-    double nhat_dot_B = F->Bflux / F->nhat[0];
+      /* We take the average of four estimates of curlA, one for each vertex. In
+	 principle we could choose from any of the 4-choose-2 = 6 pairs of
+	 vertices. */
+      estimate_curlA(C, 0, 1, 2, crlA0);
+      estimate_curlA(C, 1, 3, 0, crlA1);
+      estimate_curlA(C, 2, 0, 3, crlA2);
+      estimate_curlA(C, 3, 2, 1, crlA3);
 
-    if (F->cells[0]) {
-      F->cells[0]->U[B11] += nhat_dot_B * F->nhat[1];
-      F->cells[0]->U[B33] += nhat_dot_B * F->nhat[3];
-      F->cells[0]->weightA += F->nhat[1];
-      F->cells[0]->weightB += F->nhat[3];
-    }
+      /*
+       *
+       *  1-------3
+       *  |       |
+       *  |       |
+       *  0-------2
+       *
+       */
 
-    if (F->cells[1]) {
-      F->cells[1]->U[B11] += nhat_dot_B * F->nhat[1];
-      F->cells[1]->U[B33] += nhat_dot_B * F->nhat[3];
-      F->cells[1]->weightA += F->nhat[1];
-      F->cells[1]->weightB += F->nhat[3];
-    }
-  }
-
-  for (int n=0; n<sim->num_rows; ++n) {
-    DL_FOREACH(sim->rows[n].cells, C) {
-      if (fabs(C->weightA) > 1e-12) C->U[B11] *= C->dA[1] / C->weightA;
-      if (fabs(C->weightB) > 1e-12) C->U[B33] *= C->dA[3] / C->weightB;
-      C->weightA = 0.0;
-      C->weightB = 0.0;
+      C->U[B11] = 0.25 * (crlA0[0] + crlA1[0] + crlA2[0] + crlA3[0]) * C->dA[1];
+      C->U[B33] = 0.25 * (crlA0[1] + crlA1[1] + crlA2[1] + crlA3[1]) * C->dA[3];
     }
   }
 }
@@ -431,26 +451,50 @@ void gusto_transmit_fluxes(struct gusto_sim *sim, double dt)
 
 
 
-void gusto_transmit_emf(struct gusto_sim *sim, double dt)
+void gusto_advance_vector_potential(struct gusto_sim *sim, double dt)
+/*
+ * Use the Efield data stored on cell vertices to advance the vector potential
+ * data at the same location. Efield is part of the vertex data itself, and was
+ * evaluated at the compte_fluxes stage.
+ *
+ *                           \dot{A} = -E
+ *
+ * E will be the motional electric field E = -(v - v0) \times B where v0 is the
+ * vertex velocity. So if the vertex moves precisely with the fluid velocity, E
+ * will be zero.
+ */
 {
-  struct mesh_face *F;
+  struct mesh_vert *V;
 
-  DL_FOREACH(sim->faces, F) {
-
-    double Ef0 = F->verts[0]->aux[0].electric_field;
-    double Ef1 = F->verts[1]->aux[0].electric_field;
-    double dl0 = F->verts[0]->aux[0].R;
-    double dl1 = F->verts[1]->aux[0].R;
-
-    if (sim->user.coordinates == 'c' ||
-	sim->user.coordinates == 's') {
-      dl0 *= 2 * M_PI;
-      dl1 *= 2 * M_PI;
+  for (int n=0; n<sim->num_rows; ++n) {
+    DL_FOREACH(sim->rows[n].verts, V) {
+      V->aux[0].vector_potential -= V->Efield * dt;
     }
-
-    F->Bflux += (Ef0 * dl0 - Ef1 * dl1) * dt;
   }
 }
+
+
+
+/* void gusto_transmit_emf(struct gusto_sim *sim, double dt) */
+/* { */
+/*   struct mesh_face *F; */
+
+/*   DL_FOREACH(sim->faces, F) { */
+
+/*     double Ef0 = F->verts[0]->aux[0].vector_potential; */
+/*     double Ef1 = F->verts[1]->aux[0].vector_potential; */
+/*     double dl0 = F->verts[0]->aux[0].R; */
+/*     double dl1 = F->verts[1]->aux[0].R; */
+
+/*     if (sim->user.coordinates == 'c' || */
+/*	sim->user.coordinates == 's') { */
+/*       dl0 *= 2 * M_PI; */
+/*       dl1 *= 2 * M_PI; */
+/*     } */
+
+/*     F->Bflux += (Ef0 * dl0 - Ef1 * dl1) * dt; */
+/*   } */
+/* } */
 
 
 
@@ -540,7 +584,7 @@ void gusto_default_aux(struct aux_variables *A)
 {
   A->comoving_mass_density = 1.0;
   A->gas_pressure = 1.0;
-  A->electric_field = 0.0;
+  A->vector_potential = 0.0;
   A->velocity_four_vector[1] = 0.0;
   A->velocity_four_vector[2] = 0.0;
   A->velocity_four_vector[3] = 0.0;
@@ -612,7 +656,7 @@ void gusto_to_conserved(struct aux_variables *A, double U[8], double dA[4])
   U[B22] = dA[2] * (b2 * u0 - u2 * b0);
   U[B33] = dA[3] * (b3 * u0 - u3 * b0);
 
-  U[S22] *= A->R; /* if in cylindrical coordinates */
+  U[S22] *= A->R; /* R != 1 if in cylindrical coordinates */
 }
 
 
@@ -780,7 +824,7 @@ int gusto_fluxes(struct aux_variables *A, double n[4], double F[8])
   F[B22] = B2 * vn - Bn * v2;
   F[B33] = B3 * vn - Bn * v3;
 
-  F[S22] *= A->R; /* if in cylindrical coordinates */
+  F[S22] *= A->R; /* R != 1 if in cylindrical coordinates */
 
   return 0;
 }

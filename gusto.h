@@ -44,7 +44,7 @@ struct aux_variables
   double gas_pressure;
   double magnetic_pressure;
   double enthalpy_density; /* includes magnetic part: h + b^2 */
-  double electric_field;   /* out-of-plane E field or vector potential */
+  double vector_potential; /* vector potential */
   double R;                /* factor for cylindrical coordinates */
 } ;
 
@@ -143,6 +143,7 @@ void gusto_compute_fluxes(struct gusto_sim *sim);
 void gusto_compute_cell_magnetic_field(struct gusto_sim *sim);
 void gusto_transmit_fluxes(struct gusto_sim *sim, double dt);
 void gusto_transmit_emf(struct gusto_sim *sim, double dt);
+void gusto_advance_vector_potential(struct gusto_sim *sim, double dt);
 void gusto_add_source_terms(struct gusto_sim *sim, double dt);
 
 
