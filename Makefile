@@ -12,7 +12,7 @@ HDF5_I = -I$(HDF5_HOME)/include
 HDF5_L = -L$(HDF5_HOME)/lib -lhdf5
 endif
 
-SRC = gusto.c mesh.c ser.c quartic.c srmhd_c2p.c chkpt.c utils.c physics.c
+SRC = gusto.c mesh.c ser.c quartic.c srmhd_c2p.c chkpt.c utils.c physics.c initial.c
 OBJ = $(SRC:.c=.o)
 APP = gusto
 HEADERS = gusto.h ser.h
