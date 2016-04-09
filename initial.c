@@ -117,14 +117,17 @@ const char **id_abc_ff(struct gusto_user *user,
 		       struct aux_variables *A, double *X)
 {
   if (A == NULL) {
-    static const char *help[] = { "-- ABC magnetic field --",
-				  NULL };
+    static const char *help[] =
+      { "-- ABC magnetic field --",
+	"fourvel0: four velocity in the R direction",
+	"fourvel1: four velocity in the z direction",
+	NULL };
     return help;
   }
 
-  double a = 1.0;
+  double a = 0.5;
   double b = 0.0;
-  double c = 1.0;
+  double c = 0.5;
 
   double al = 2 * M_PI;
   double B1 = c * cos(X[3] * al) - b * sin(X[2] * al);
@@ -136,6 +139,8 @@ const char **id_abc_ff(struct gusto_user *user,
   A->magnetic_four_vector[3] = B3;
 
   A->vector_potential = B2 / al;
+  A->velocity_four_vector[1] = user->fourvel0;
+  A->velocity_four_vector[3] = user->fourvel1;
 
   return NULL;
 }

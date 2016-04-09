@@ -146,8 +146,8 @@ void gusto_compute_cell_magnetic_field(struct gusto_sim *sim)
        *     |       |
        *  (+)0-------2(+)
        *
-       *  x : [curl(1,2;3,0)]
-       *  + : [curl(0,1;0,2) + curl(1,3;1,0) + curl(2,0;2,3) + curl(3,2;3,1)]/4
+       * x : [curl(1,2;3,0)]
+       * + : [curl(0,1;0,2) + curl(1,3;1,0) + curl(2,0;2,3) + curl(3,2;3,1)] / 4
        */
 
       if (sim->user.curl_mode == '+') {
@@ -248,7 +248,15 @@ void gusto_recover_variables(struct gusto_sim *sim)
   struct mesh_cell *C;
   for (int n=0; n<sim->num_rows; ++n) {
     DL_FOREACH(sim->rows[n].cells, C) {
-      gusto_from_conserved(C->aux, C->U, C->dA);
+      if (C->cell_type == 'g') { /* don't bother if it's a guard */
+	continue;
+      }
+      if (gusto_from_conserved(C->aux, C->U, C->dA)) {
+	printf("[gusto] at index [%d %d]\n",
+	       C->verts[0]->row_index,
+	       C->verts[0]->col_index / 2);
+	exit(1);
+      }
     }
   }
 }
@@ -260,10 +268,19 @@ void gusto_compute_vertex_velocities(struct gusto_sim *sim)
   struct mesh_vert *V;
   for (int n=0; n<sim->num_rows; ++n) {
     DL_FOREACH(sim->rows[n].verts, V) {
+
       double *u = V->aux[0].velocity_four_vector;
       V->v[1] = u[1] / u[0];
       V->v[2] = u[2] / u[0];
       V->v[3] = u[3] / u[0];
+
+      /* double u[4] = {0, sim->user.fourvel1, 0, 0}; */
+      /* u[0] = sqrt(1 + u[1]*u[1]); */
+
+      /* V->v[1] = u[1] / u[0]; */
+      /* V->v[2] = u[2] / u[0]; */
+      /* V->v[3] = u[3] / u[0]; */
+
     }
   }
 }
@@ -439,10 +456,10 @@ int gusto_from_conserved(struct aux_variables *A, double U[8], double dA[4])
   srmhd_c2p_del(c2p);
 
   if (error != 0) {
-    printf("c2p failed: %s\n", srmhd_c2p_get_error(c2p, error));
-    printf("%f %f %f %f %f %f %f %f\n",
-	   Uin[0], Uin[1], Uin[2], Uin[3], Uin[4], Uin[5], Uin[6], Uin[7]);
-    exit(1);
+    printf("[gusto] ERROR: %s\n", srmhd_c2p_get_error(c2p, error));
+    printf("[gusto] failed at on U = [%f %f %f %f %f %f %f %f]\n",
+	   Uin[0], Uin[1], Uin[2], Uin[3],
+	   Uin[4], Uin[5], Uin[6], Uin[7]);
   }
 
   return error;

@@ -204,7 +204,6 @@ OpInitialMesh gusto_lookup_initial_mesh(const char *user_key)
 
 void gusto_mesh_generate_verts(struct gusto_sim *sim)
 {
-
   int row_size = sim->user.N[0];
   int ngz = sim->user.ng[0]; /* number of ghost cells in the long direction */
   int ngR = sim->user.ng[1]; /* number of ghost cells in the tran direction */
@@ -273,6 +272,8 @@ void gusto_mesh_generate_cells(struct gusto_sim *sim)
 {
   struct mesh_vert *VL, *VR;
   struct mesh_cell *C;
+  int ng_col = sim->user.ng[0];
+  int ng_row = sim->user.ng[1];
 
   /* ----------------------------------------------------------------------
    * Add the cells, one for each i index (z coordinate) except the last.
@@ -288,6 +289,22 @@ void gusto_mesh_generate_cells(struct gusto_sim *sim)
       C->verts[1] = VL;
       C->verts[2] = VR; VR = VR->next->next;
       C->verts[3] = VR;
+
+      /* TODO: this only works when ng_col is 0 or 1 */
+
+      if (n < ng_row || n >= sim->num_rows - ng_row) {
+	C->cell_type = 'g';
+      }
+      else if (ng_col == 1 && C->verts[0]->col_index == 0) {
+	C->cell_type = 'g';
+      }
+      else if (ng_col == 1 && C->verts[3]->next == NULL) {
+	C->cell_type = 'g';
+      }
+      else {
+	C->cell_type = 'i';
+      }
+
       DL_APPEND(sim->rows[n].cells, C);
     }
   }
