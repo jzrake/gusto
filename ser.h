@@ -23,6 +23,7 @@ struct gusto_user {
     double sigma;
     double entropy;
     char curl_mode;
+    int advance_poloidal_field;
 };
 
 

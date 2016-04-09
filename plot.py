@@ -20,13 +20,9 @@ def plot_faces(filename, args):
 def plot_1d(filename, args):
     dset = gusto_dataset.GustoDataset(filename)
     x = dset.get_cell_variable('x1')
-    y = dset.get_cell_variable('u1')
-    p = dset.get_cell_variable('pg')
-    d = dset.get_cell_variable('dg')
-    s = np.log(p / d**(4./3))
-    #y = s
+    y = dset.get_cell_variable(args.data)
     c = float(global_vars['file_index']) / global_vars['num_files']
-    plt.plot(x, y, '-', c=[c]*3)
+    plt.plot(x, y, '-o', c=[c]*3)
 
 
 def triangle_variable_plot(filename, args):

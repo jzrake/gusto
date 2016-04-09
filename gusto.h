@@ -145,7 +145,6 @@ void gusto_compute_variables_at_vertices(struct gusto_sim *sim);
 void gusto_compute_fluxes(struct gusto_sim *sim);
 void gusto_compute_cell_magnetic_field(struct gusto_sim *sim);
 void gusto_transmit_fluxes(struct gusto_sim *sim, double dt);
-void gusto_transmit_emf(struct gusto_sim *sim, double dt);
 void gusto_advance_vector_potential(struct gusto_sim *sim, double dt);
 void gusto_add_source_terms(struct gusto_sim *sim, double dt);
 

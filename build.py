@@ -22,11 +22,12 @@ user_struct = [
     ('pressure1', 'double', 1.0),
     ('density0', 'double', 1.0),
     ('density1', 'double', 1.0),
-    ('fourvel0', 'double', 1.0),
-    ('fourvel1', 'double', 1.0),
+    ('fourvel0', 'double', 0.0),
+    ('fourvel1', 'double', 0.0),
     ('sigma', 'double', 1.0),
     ('entropy', 'double', 1.0),
     ('curl_mode', 'char', '+'),
+    ('advance_poloidal_field', 'int', 1),
 ]
 
 

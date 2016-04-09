@@ -115,8 +115,8 @@ const char **initial_data_density_wave(struct gusto_user *user,
 
 
 
-const char **initial_data_abc_field(struct gusto_user *user,
-				    struct aux_variables *A, double *X)
+const char **initial_data_abc_ff(struct gusto_user *user,
+				 struct aux_variables *A, double *X)
 {
   if (A == NULL) {
     static const char *help[] = { "-- ABC magnetic field --",
@@ -138,6 +138,30 @@ const char **initial_data_abc_field(struct gusto_user *user,
   A->magnetic_four_vector[3] = B3;
 
   A->vector_potential = B2 / al;
+
+  return NULL;
+}
+
+
+
+const char **initial_data_cyl_ff(struct gusto_user *user,
+				 struct aux_variables *A, double *X)
+{
+  if (A == NULL) {
+    static const char *help[] =
+      { "-- Cylindrical force-free magnetic field --",
+	NULL };
+    return help;
+  }
+
+  double R = X[1];
+  double B1 = 0.0;
+  double B2 = j1(R);
+  double B3 = j0(R);
+
+  A->magnetic_four_vector[1] = B1;
+  A->magnetic_four_vector[2] = B2;
+  A->magnetic_four_vector[3] = B3;
 
   return NULL;
 }
@@ -212,7 +236,8 @@ OpInitialData gusto_lookup_initial_data(const char *user_key)
     "uniform",
     "cylindrical_shock",
     "density_wave",
-    "abc_field",
+    "abc_ff",
+    "cyl_ff",
     "michel69",
     NULL
   } ;
@@ -220,7 +245,8 @@ OpInitialData gusto_lookup_initial_data(const char *user_key)
     initial_data_uniform,
     initial_data_cylindrical_shock,
     initial_data_density_wave,
-    initial_data_abc_field,
+    initial_data_abc_ff,
+    initial_data_cyl_ff,
     initial_data_michel69,
     NULL } ;
   int n = 0;
@@ -274,7 +300,7 @@ void gusto_initial_data(struct gusto_sim *sim)
   }
 
 
-  if (1) {
+  if (sim->user.advance_poloidal_field) {
 
     gusto_compute_cell_magnetic_field(sim);
 
@@ -376,15 +402,19 @@ void gusto_compute_cell_magnetic_field(struct gusto_sim *sim)
 
       /*
        *
-       *  1-------3
-       *  |       |
-       *  |       |
-       *  0-------2
+       *  (+)1-------3(+)
+       *     |       |
+       *     |   x   |
+       *     |       |
+       *  (+)0-------2(+)
        *
+       *  x : [curl(1,2;3,0)]
+       *  + : [curl(0,1;0,2) + curl(1,3;1,0) + curl(2,0;2,3) + curl(3,2;3,1)]/4
        */
 
       if (sim->user.curl_mode == '+') {
-	/* We take the average of four estimates of curlA, one for each vertex. */
+	/* Evaluate curl A using four estimates of curlA, one at each vertex
+	   based on the difference of A biased toward the cell center. */
 	double crlA0[2];
 	double crlA1[2];
 	double crlA2[2];
@@ -393,12 +423,12 @@ void gusto_compute_cell_magnetic_field(struct gusto_sim *sim)
 	gusto_curlA1(C, 1, 3, 0, crlA1);
 	gusto_curlA1(C, 2, 0, 3, crlA2);
 	gusto_curlA1(C, 3, 2, 1, crlA3);
-	C->U[B11] = 0.25 * (crlA0[0] + crlA1[0] + crlA2[0] + crlA3[0]) * C->dA[1];
-	C->U[B33] = 0.25 * (crlA0[1] + crlA1[1] + crlA2[1] + crlA3[1]) * C->dA[3];
+	C->U[B11] = (crlA0[0] + crlA1[0] + crlA2[0] + crlA3[0]) / 4 * C->dA[1];
+	C->U[B33] = (crlA0[1] + crlA1[1] + crlA2[1] + crlA3[1]) / 4 * C->dA[3];
       }
       else if (sim->user.curl_mode == 'x') {
-	/* We use all four vertices at once to get one estimate at (or near) the
-	   cell center. */
+	/* Evaluate curl A using all four vertices at once to get one estimate
+	   at (or near) the cell center. */
 	double crlA[2];
 	gusto_curlA2(C, crlA);
 	C->U[B11] = crlA[0] * C->dA[1];
@@ -451,29 +481,6 @@ void gusto_advance_vector_potential(struct gusto_sim *sim, double dt)
     }
   }
 }
-
-
-
-/* void gusto_transmit_emf(struct gusto_sim *sim, double dt) */
-/* { */
-/*   struct mesh_face *F; */
-
-/*   DL_FOREACH(sim->faces, F) { */
-
-/*     double Ef0 = F->verts[0]->aux[0].vector_potential; */
-/*     double Ef1 = F->verts[1]->aux[0].vector_potential; */
-/*     double dl0 = F->verts[0]->aux[0].R; */
-/*     double dl1 = F->verts[1]->aux[0].R; */
-
-/*     if (sim->user.coordinates == 'c' || */
-/*	sim->user.coordinates == 's') { */
-/*       dl0 *= 2 * M_PI; */
-/*       dl1 *= 2 * M_PI; */
-/*     } */
-
-/*     F->Bflux += (Ef0 * dl0 - Ef1 * dl1) * dt; */
-/*   } */
-/* } */
 
 
 
@@ -958,6 +965,8 @@ void bc_inflow(struct gusto_sim *sim)
 
     while (Couter0->next) Couter0 = Couter0->next;
 
+    gusto_default_aux(&Cinner0->aux[0]);
+    gusto_default_aux(&Couter0->aux[0]);
     sim->initial_data(&sim->user, &Couter0->aux[0], Couter0->x);
     sim->initial_data(&sim->user, &Cinner0->aux[0], Cinner0->x);
 

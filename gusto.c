@@ -132,8 +132,11 @@ int main(int argc, char **argv)
 
     gusto_compute_fluxes(&sim);
     gusto_transmit_fluxes(&sim, dt);
-    gusto_advance_vector_potential(&sim, dt);
     gusto_add_source_terms(&sim, dt);
+
+    if (sim.user.advance_poloidal_field) {
+      gusto_advance_vector_potential(&sim, dt);
+    }
 
     if (sim.user.move_cells) {
       gusto_mesh_advance_vertices(&sim, dt);
@@ -141,7 +144,10 @@ int main(int argc, char **argv)
       gusto_mesh_compute_geometry(&sim);
     }
 
-    gusto_compute_cell_magnetic_field(&sim);
+    if (sim.user.advance_poloidal_field) {
+      gusto_compute_cell_magnetic_field(&sim);
+    }
+
     gusto_recover_variables(&sim);
     sim.boundary_con(&sim);
 
