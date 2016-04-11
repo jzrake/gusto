@@ -66,6 +66,7 @@ void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname)
       WRITE_VARIABLE_VERT(x[1], "x1");
       WRITE_VARIABLE_VERT(x[2], "x2");
       WRITE_VARIABLE_VERT(x[3], "x3");
+      WRITE_VARIABLE_VERT(aux[0].vector_potential, "A2");
       free(data);
       H5Sclose(spc);
     }
@@ -90,6 +91,7 @@ void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname)
       WRITE_VARIABLE_CELL(aux[0].magnetic_four_vector[3], "b3");
       WRITE_VARIABLE_CELL(aux[0].comoving_mass_density, "dg");
       WRITE_VARIABLE_CELL(aux[0].gas_pressure, "pg");
+      WRITE_VARIABLE_CELL(aux[0].vector_potential, "A2");
 
       WRITE_VARIABLE_CELL(verts[0]->x[1], "v0.x1");
       WRITE_VARIABLE_CELL(verts[0]->x[2], "v0.x2");

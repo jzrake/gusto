@@ -167,18 +167,65 @@ void initial_mesh_spherical(struct gusto_user *user, struct mesh_vert *V)
 
 
 
+void initial_mesh_narayan07(struct gusto_user *user, struct mesh_vert *V)
+{
+  /* Longitudinal direction is r, uses log binning in r */
+  int row_size = user->N[0];
+  int num_rows = user->N[1];
+  int ngz = user->ng[0];
+  int ngY = user->ng[1];
+  int Nz = row_size - 2 * ngz;
+  int NY = num_rows - 2 * ngY;
+  int n = V->row_index     - ngY;
+  int i = V->col_index / 2 - ngz;
+  int p = V->col_index % 2;
+
+  double nu = 1.0;
+  double z0 = user->domain[0];
+  double z1 = user->domain[1];
+  double Y0 = user->domain[2];
+  double Y1 = user->domain[3];
+
+  double dY = (Y1 - Y0) / NY;
+  double Yc = Y0 + dY * (n + 0.5);
+
+  double R0 = sqrt(Yc * (2 * z0 + Yc)); /* lower / upper R coordinate for Yc */
+  double R1 = sqrt(Yc * (2 * z1 + Yc)); /* specific to nu=1 */
+  double u0 = z0 / R0;                  /* lower / upper u coordinate for Yc */
+  double u1 = z1 / R1;
+
+  double du = (u1 - u0) / Nz;
+  double u = u0 + du * i;
+  double T = sqrt(1 + u*u) - u; /* specific to nu=1 */
+  double R = pow(Yc / T, 1./nu);
+  double z = u * R;
+
+  double dl[2] = {0.5 * dY * (u + sqrt(1 + u*u)), -0.5 * dY};
+  double Rv = R + dl[0] * (p ? 0.5 : -0.5);
+  double zv = z + dl[1] * (p ? 0.5 : -0.5);
+
+  V->x[0] = 0.0;
+  V->x[1] = Rv;
+  V->x[2] = 0.0;
+  V->x[3] = zv;
+}
+
+
+
 OpInitialMesh gusto_lookup_initial_mesh(const char *user_key)
 {
   const char *keys[] = {
     "planar",
     "cylindrical",
     "spherical",
+    "narayan07",
     NULL
   } ;
   OpInitialMesh vals[] = {
     initial_mesh_planar,
     initial_mesh_cylindrical,
     initial_mesh_spherical,
+    initial_mesh_narayan07,
     NULL } ;
   int n = 0;
   const char *key;

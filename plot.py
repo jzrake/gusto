@@ -43,12 +43,22 @@ def triangle_mesh_plot(filename, args):
     plt.axis('equal')
 
 
+def triangle_vert_plot(filename, args):
+    dset = gusto_dataset.GustoDataset(filename)
+    x = dset.get_vert_variable('x1')
+    z = dset.get_vert_variable('x3')
+    f = dset.get_vert_variable(args.data)
+    plt.tripcolor(x, z, f)
+    plt.axis('equal')
+
+
 def mesh_plot(filename, args):
     from matplotlib.collections import PolyCollection
     dset = gusto_dataset.GustoDataset(filename)
     vert = dset.get_cell_polygons()
     data = dset.get_cell_variable(args.data)
-    cells = PolyCollection(vert, array=data, cmap=args.cmap, linewidths=0.0)
+    #data = np.log10(data)
+    cells = PolyCollection(vert, array=data, cmap=args.cmap, linewidths=0.25)
     fig = plt.figure()
     ax0 = fig.add_subplot(1, 1, 1)
     ax0.add_collection(cells)
@@ -68,6 +78,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     plots = {'1d': plot_1d,
+             'vert': triangle_vert_plot,
              'trimesh': triangle_mesh_plot,
              'triplot': triangle_variable_plot,
              'mesh': mesh_plot,

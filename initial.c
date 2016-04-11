@@ -176,7 +176,7 @@ const char **id_michel69(struct gusto_user *user,
 {
   if (A == NULL) {
     static const char *help[] =
-      {"-- Michel 1969 cold MHD wind --",
+      {"-- Michel (1969) cold MHD wind --",
        "Use with spherical coordinate source terms and radial mesh if in 1D.",
        "",
        "entropy: uniform entropy (choose something small)",
@@ -233,6 +233,33 @@ const char **id_michel69(struct gusto_user *user,
 
 
 
+const char **id_narayan07(struct gusto_user *user,
+			  struct aux_variables *A, double *X)
+{
+  if (A == NULL) {
+    static const char *help[] =
+      {"-- Narayan et al. (2007) self-similar force-free disk winds --",
+       NULL};
+    return help;
+  }
+
+  double R = X[1];
+  double z = X[3];
+  double r = sqrt(R*R + z*z);
+  double cost = z / r;
+  double sint = R / r;
+  double Br = 1.0 / (r * r);
+  double Y = r - z;
+  A->magnetic_four_vector[1] = Br * sint;
+  A->magnetic_four_vector[2] = 0.0;
+  A->magnetic_four_vector[3] = Br * cost;
+  A->vector_potential = Y / R;
+
+  return NULL;
+}
+
+
+
 OpInitialData gusto_lookup_initial_data(const char *user_key)
 {
   const char *keys[] = {
@@ -242,6 +269,7 @@ OpInitialData gusto_lookup_initial_data(const char *user_key)
     "abc_ff",
     "cyl_ff",
     "michel69",
+    "narayan07",
     NULL
   } ;
   OpInitialData vals[] = {
@@ -251,6 +279,7 @@ OpInitialData gusto_lookup_initial_data(const char *user_key)
     id_abc_ff,
     id_cyl_ff,
     id_michel69,
+    id_narayan07,
     NULL } ;
   int n = 0;
   const char *key;

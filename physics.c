@@ -150,6 +150,12 @@ void gusto_compute_cell_magnetic_field(struct gusto_sim *sim)
        * + : [curl(0,1;0,2) + curl(1,3;1,0) + curl(2,0;2,3) + curl(3,2;3,1)] / 4
        */
 
+      double Y = 0.25 * C->aux[0].R * (C->verts[0]->aux[0].vector_potential +
+				       C->verts[1]->aux[0].vector_potential +
+				       C->verts[2]->aux[0].vector_potential +
+				       C->verts[3]->aux[0].vector_potential);
+      C->aux[0].vector_potential = Y;
+
       if (sim->user.curl_mode == '+') {
 	/* Evaluate curl A using four estimates of curlA, one at each vertex
 	   based on the difference of A biased toward the cell center. */
