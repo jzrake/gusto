@@ -243,16 +243,45 @@ const char **id_narayan07(struct gusto_user *user,
     return help;
   }
 
+  double M = 0.2;
+  double s = 2.0;
   double R = X[1];
   double z = X[3];
   double r = sqrt(R*R + z*z);
-  double cost = z / r;
-  double sint = R / r;
-  double Br = 1.0 / (r * r);
-  double Y = r - z;
-  A->magnetic_four_vector[1] = Br * sint;
-  A->magnetic_four_vector[2] = 0.0;
-  A->magnetic_four_vector[3] = Br * cost;
+
+  double Bz = 1.0 / r;
+  double BR = (1.0 - z / r) / R;
+  double Bf = -s * M / R; /* Equation (45) N07 */
+  double Bp = sqrt(BR*BR + Bz*Bz);
+
+  double Y = r - z;       /* the flux function */
+  double T = Y / R;
+  double omega = M / (T * R);
+
+  double gradY[4] = {0, R*Bz, 0, -R*BR};
+  double B[4] = {0, BR, Bf, Bz};
+  double E[4] = {0, -omega * gradY[1], 0, -omega * gradY[3]};
+  double S[4] = VEC4_CROSS(E, B);
+  double U = 0.5 * (VEC4_DOT(E,E) + VEC4_DOT(B,B));
+  double vE[4] = { 0, S[1]/U, S[2]/U, S[3]/U };
+  double u0 = pow(1.0 - VEC4_DOT(vE, vE), -0.5);
+  double uR = vE[1] * u0;
+  double uf = vE[2] * u0;
+  double uz = vE[3] * u0;
+  double up = sqrt(uR*uR + uz*uz);
+  double b0 = uR*BR + uf*Bf + uz*Bz;
+  double dg = Bp / up;
+  double s0 = user->entropy; /* log(p / rho^Gamma) */
+  double pg = exp(s0) * pow(dg, gamma_law_index);
+
+  A->velocity_four_vector[1] = uR;
+  A->velocity_four_vector[2] = uf;
+  A->velocity_four_vector[3] = uz;
+  A->magnetic_four_vector[1] = (BR + b0 * uR) / u0;
+  A->magnetic_four_vector[2] = (Bf + b0 * uf) / u0;
+  A->magnetic_four_vector[3] = (Bz + b0 * uz) / u0;
+  A->comoving_mass_density = dg;
+  A->gas_pressure = pg;
   A->vector_potential = Y / R;
 
   return NULL;
