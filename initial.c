@@ -262,15 +262,15 @@ const char **id_narayan07(struct gusto_user *user,
   double B[4] = {0, BR, Bf, Bz};
   double E[4] = {0, -omega * gradY[1], 0, -omega * gradY[3]};
   double S[4] = VEC4_CROSS(E, B);
-  double U = 0.5 * (VEC4_DOT(E,E) + VEC4_DOT(B,B));
-  double vE[4] = { 0, S[1]/U, S[2]/U, S[3]/U };
-  double u0 = pow(1.0 - VEC4_DOT(vE, vE), -0.5);
-  double uR = vE[1] * u0;
-  double uf = vE[2] * u0;
-  double uz = vE[3] * u0;
+  double U = VEC4_DOT(B,B);
+  double vm[4] = { 0, S[1]/U, S[2]/U, S[3]/U };
+  double u0 = pow(1.0 - VEC4_DOT(vm, vm), -0.5);
+  double uR = vm[1] * u0;
+  double uf = vm[2] * u0;
+  double uz = vm[3] * u0;
   double up = sqrt(uR*uR + uz*uz);
   double b0 = uR*BR + uf*Bf + uz*Bz;
-  double dg = Bp / up;
+  double dg = user->density0 * Bp / up;
   double s0 = user->entropy; /* log(p / rho^Gamma) */
   double pg = exp(s0) * pow(dg, gamma_law_index);
 
@@ -283,6 +283,21 @@ const char **id_narayan07(struct gusto_user *user,
   A->comoving_mass_density = dg;
   A->gas_pressure = pg;
   A->vector_potential = Y / R;
+
+  /*
+   * [x] constant poloidal flux
+   * [x] constant mass flux
+   * [x] constant energy flux --- need to use v_min
+   * [x] constant L flux
+   */
+
+  /* double nhat[4] = {0, B[1]/Bp, 0, B[3]/Bp}; */
+  /* double SFlux = VEC4_DOT(S, nhat); */
+  /* double dA = 1.0 / Bp; */
+  /* double F[8]; */
+  /* gusto_complete_aux(A); */
+  /* gusto_fluxes(A, nhat, F); */
+  /* printf("S.dA=%f F[TAU].dA=%f\n", SFlux * dA, (F[TAU] + F[DDD]) * dA); */
 
   return NULL;
 }
