@@ -14,12 +14,16 @@ struct gusto_sim;
 struct mesh_vert;
 struct mesh_face;
 struct mesh_cell;
+struct mesh_query;
 
 
 typedef void (*OpBoundaryCon)(struct gusto_sim *sim);
-typedef void (*OpInitialMesh)(struct gusto_user *user, struct mesh_vert *V);
+typedef void (*OpInitialMesh)(struct gusto_user *user,
+			      struct mesh_vert *V,
+			      struct mesh_query *Q);
 typedef const char **(*OpInitialData)(struct gusto_user *user,
-				      struct aux_variables *A, double *X);
+				      struct aux_variables *A,
+				      double *X);
 
 
 struct gusto_sim
@@ -95,6 +99,11 @@ struct mesh_row
   struct mesh_cell *cells;
 } ;
 
+struct mesh_query
+{
+  int row_index;
+  int row_size;
+} ;
 
 
 /*

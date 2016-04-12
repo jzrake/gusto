@@ -720,22 +720,33 @@ void bc_periodic_all(struct gusto_sim *sim)
 
 void bc_inflow(struct gusto_sim *sim)
 {
+  struct mesh_cell *C;
   for (int n=0; n<sim->num_rows; ++n) {
-    struct mesh_cell *Cinner0 = sim->rows[n].cells;
-    struct mesh_cell *Couter0 = sim->rows[n].cells;
-
-    while (Couter0->next) Couter0 = Couter0->next;
-
-    gusto_default_aux(&Cinner0->aux[0]);
-    gusto_default_aux(&Couter0->aux[0]);
-    sim->initial_data(&sim->user, &Couter0->aux[0], Couter0->x);
-    sim->initial_data(&sim->user, &Cinner0->aux[0], Cinner0->x);
-
-    gusto_complete_aux(&Cinner0->aux[0]);
-    gusto_complete_aux(&Couter0->aux[0]);
-    gusto_to_conserved(&Cinner0->aux[0], Cinner0->U, Cinner0->dA);
-    gusto_to_conserved(&Couter0->aux[0], Couter0->U, Couter0->dA);
+    DL_FOREACH(sim->rows[n].cells, C) {
+      if (C->cell_type == 'g') {
+	gusto_default_aux(&C->aux[0]);
+	sim->initial_data(&sim->user, &C->aux[0], C->x);
+	gusto_complete_aux(&C->aux[0]);
+	gusto_to_conserved(&C->aux[0], C->U, C->dA);
+      }
+    }
   }
+  /* for (int n=0; n<sim->num_rows; ++n) { */
+  /*   struct mesh_cell *Cinner0 = sim->rows[n].cells; */
+  /*   struct mesh_cell *Couter0 = sim->rows[n].cells; */
+
+  /*   while (Couter0->next) Couter0 = Couter0->next; */
+
+  /*   gusto_default_aux(&Cinner0->aux[0]); */
+  /*   gusto_default_aux(&Couter0->aux[0]); */
+  /*   sim->initial_data(&sim->user, &Couter0->aux[0], Couter0->x); */
+  /*   sim->initial_data(&sim->user, &Cinner0->aux[0], Cinner0->x); */
+
+  /*   gusto_complete_aux(&Cinner0->aux[0]); */
+  /*   gusto_complete_aux(&Couter0->aux[0]); */
+  /*   gusto_to_conserved(&Cinner0->aux[0], Cinner0->U, Cinner0->dA); */
+  /*   gusto_to_conserved(&Couter0->aux[0], Couter0->U, Couter0->dA); */
+  /* } */
 }
 
 

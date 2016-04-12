@@ -57,7 +57,14 @@ def mesh_plot(filename, args):
     dset = gusto_dataset.GustoDataset(filename)
     vert = dset.get_cell_polygons()
     data = dset.get_cell_variable(args.data)
-    #data = np.log10(data)
+    # print data.shape
+    # exit()
+    # u1 = dset.get_cell_variable('u1')
+    # u3 = dset.get_cell_variable('u3')
+    # up = (u1**2 + u3**2)**0.5
+    # data = up
+    # data = np.log10(data)
+
     cells = PolyCollection(vert, array=data, cmap=args.cmap, linewidths=0.25)
     fig = plt.figure()
     ax0 = fig.add_subplot(1, 1, 1)

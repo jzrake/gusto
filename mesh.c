@@ -86,7 +86,9 @@ int gusto_mesh_count(struct gusto_sim *sim, char which, int n)
 
 
 
-void initial_mesh_planar(struct gusto_user *user, struct mesh_vert *V)
+void initial_mesh_planar(struct gusto_user *user,
+			 struct mesh_vert *V,
+			 struct mesh_query *Q)
 {
   /* Longitudinal direction is z */
   int ngz = user->ng[0];
@@ -95,9 +97,6 @@ void initial_mesh_planar(struct gusto_user *user, struct mesh_vert *V)
   int num_rows = user->N[1] + 2 * ngR;
   int NR = num_rows - 2 * ngR;
   int Nz = row_size - 2 * ngz;
-  int n = V->row_index     - ngR;
-  int i = V->col_index / 2 - ngz;
-  int p = V->col_index % 2;
   double st = user->mesh_stagger;
   double R0 = user->domain[0];
   double R1 = user->domain[1];
@@ -105,15 +104,25 @@ void initial_mesh_planar(struct gusto_user *user, struct mesh_vert *V)
   double z1 = user->domain[3];
   double dR = (R1 - R0) / NR;
   double dz = (z1 - z0) / Nz;
-  V->x[0] = 0.0;
-  V->x[1] = R0 + (n + p) * dR;
-  V->x[2] = 0.0;
-  V->x[3] = z0 + (i + 0) * dz + st * dz * (n % 2 == 0);
+  if (Q) {
+    Q->row_size = user->N[0];
+  }
+  if (V) {
+    int n = V->row_index     - ngR;
+    int i = V->col_index / 2 - ngz;
+    int p = V->col_index % 2;
+    V->x[0] = 0.0;
+    V->x[1] = R0 + (n + p) * dR;
+    V->x[2] = 0.0;
+    V->x[3] = z0 + (i + 0) * dz + st * dz * (n % 2 == 0);
+  }
 }
 
 
 
-void initial_mesh_cylindrical(struct gusto_user *user, struct mesh_vert *V)
+void initial_mesh_cylindrical(struct gusto_user *user,
+			      struct mesh_vert *V,
+			      struct mesh_query *Q)
 {
   /* Longitudinal direction is R */
   int ngR = user->ng[0];
@@ -122,24 +131,31 @@ void initial_mesh_cylindrical(struct gusto_user *user, struct mesh_vert *V)
   int num_rows = user->N[1] + 2 * ngz;
   int Nz = num_rows - 2 * ngz;
   int NR = row_size - 2 * ngR;
-  int n = V->row_index     - ngz;
-  int i = V->col_index / 2 - ngR;
-  int p = V->col_index % 2;
   double R0 = user->domain[0];
   double R1 = user->domain[1];
   double z0 = user->domain[2];
   double z1 = user->domain[3];
   double dR = (R1 - R0) / NR;
   double dz = (z1 - z0) / Nz;
-  V->x[0] = 0.0;
-  V->x[1] = R0 + (i + 0) * dR;
-  V->x[2] = 0.0;
-  V->x[3] = z0 + (n + p) * dz;
+  if (Q) {
+    Q->row_size = user->N[0];
+  }
+  if (V) {
+    int n = V->row_index     - ngz;
+    int i = V->col_index / 2 - ngR;
+    int p = V->col_index % 2;
+    V->x[0] = 0.0;
+    V->x[1] = R0 + (i + 0) * dR;
+    V->x[2] = 0.0;
+    V->x[3] = z0 + (n + p) * dz;
+  }
 }
 
 
 
-void initial_mesh_spherical(struct gusto_user *user, struct mesh_vert *V)
+void initial_mesh_spherical(struct gusto_user *user,
+			    struct mesh_vert *V,
+			    struct mesh_query *Q)
 {
   /* Longitudinal direction is r, uses log binning in r */
   int row_size = user->N[0];
@@ -148,37 +164,41 @@ void initial_mesh_spherical(struct gusto_user *user, struct mesh_vert *V)
   int ngr = user->ng[1];
   int Nt = num_rows - 2 * ngt;
   int Nr = row_size - 2 * ngr;
-  int n = V->row_index     - ngt;
-  int i = V->col_index / 2 - ngr;
-  int p = V->col_index % 2;
   double r0 = user->domain[0];
   double r1 = user->domain[1];
   double t0 = user->domain[2];
   double t1 = user->domain[3];
-  double dr = log(r1 / r0) / Nr;
-  double dt = (t1 - t0) / Nt;
-  double r = r0 * exp(i * dr);
-  double t = t0 + dt * (n + p);
-  V->x[0] = 0.0; /* Theta is measured from equatorial plane, not the pole. */
-  V->x[1] = r * cos(t);
-  V->x[2] = 0.0;
-  V->x[3] = r * sin(t);
+  if (Q) {
+    Q->row_size = user->N[0];
+  }
+  if (V) {
+    int n = V->row_index     - ngt;
+    int i = V->col_index / 2 - ngr;
+    int p = V->col_index % 2;
+    double dr = log(r1 / r0) / Nr;
+    double dt = (t1 - t0) / Nt;
+    double r = r0 * exp(i * dr);
+    double t = t0 + dt * (n + p);
+    V->x[0] = 0.0; /* Theta is measured from equatorial plane, not the pole. */
+    V->x[1] = r * cos(t);
+    V->x[2] = 0.0;
+    V->x[3] = r * sin(t);
+  }
 }
 
 
 
-void initial_mesh_narayan07(struct gusto_user *user, struct mesh_vert *V)
+void initial_mesh_narayan07(struct gusto_user *user,
+			    struct mesh_vert *V,
+			    struct mesh_query *Q)
 {
-  /* Longitudinal direction is r, uses log binning in r */
-  int row_size = user->N[0];
   int num_rows = user->N[1];
   int ngz = user->ng[0];
   int ngY = user->ng[1];
-  int Nz = row_size - 2 * ngz;
   int NY = num_rows - 2 * ngY;
-  int n = V->row_index     - ngY;
-  int i = V->col_index / 2 - ngz;
-  int p = V->col_index % 2;
+  int n = (V ? V->row_index : Q->row_index) - ngY;
+  int i = (V ? V->col_index / 2 : 0) - ngz;
+  int p = (V ? V->col_index % 2 : 0);
 
   double nu = 1.0;
   double z0 = user->domain[0];
@@ -186,13 +206,20 @@ void initial_mesh_narayan07(struct gusto_user *user, struct mesh_vert *V)
   double Y0 = user->domain[2];
   double Y1 = user->domain[3];
 
-  double dY = (Y1 - Y0) / NY;
-  double Yc = Y0 + dY * (n + 0.5);
+  double dlogY = (log(Y1) - log(Y0)) / NY;
+  double logYc = log(Y0) + dlogY * (n + 0.5);
+  double Yc = exp(logYc);
+  double dY = Yc * dlogY;
 
   double R0 = sqrt(Yc * (2 * z0 + Yc)); /* lower / upper R coordinate for Yc */
   double R1 = sqrt(Yc * (2 * z1 + Yc)); /* specific to nu=1 */
   double u0 = z0 / R0;                  /* lower / upper u coordinate for Yc */
   double u1 = z1 / R1;
+
+  double track_length = sqrt(pow(R1 - R0, 2) + pow(z1 - z0, 2));
+  double track_width = 0.5 * dY * (u1 + sqrt(1 + u1*u1));
+  int Nz = track_length / track_width;
+  int row_size = Nz + 2 * ngz;
 
   double du = (u1 - u0) / Nz;
   double u = u0 + du * i;
@@ -204,10 +231,15 @@ void initial_mesh_narayan07(struct gusto_user *user, struct mesh_vert *V)
   double Rv = R + dl[0] * (p ? 0.5 : -0.5);
   double zv = z + dl[1] * (p ? 0.5 : -0.5);
 
-  V->x[0] = 0.0;
-  V->x[1] = Rv;
-  V->x[2] = 0.0;
-  V->x[3] = zv;
+  if (Q) {
+    Q->row_size = row_size;
+  }
+  if (V) {
+    V->x[0] = 0.0;
+    V->x[1] = Rv;
+    V->x[2] = 0.0;
+    V->x[3] = zv;
+  }
 }
 
 
@@ -251,7 +283,7 @@ OpInitialMesh gusto_lookup_initial_mesh(const char *user_key)
 
 void gusto_mesh_generate_verts(struct gusto_sim *sim)
 {
-  int row_size = sim->user.N[0];
+  //int row_size = sim->user.N[0];
   int ngz = sim->user.ng[0]; /* number of ghost cells in the long direction */
   int ngR = sim->user.ng[1]; /* number of ghost cells in the tran direction */
 
@@ -259,6 +291,11 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
   sim->rows = (struct mesh_row *) malloc(sim->num_rows*sizeof(struct mesh_row));
 
   for (int n=0; n<sim->num_rows; ++n) {
+
+    struct mesh_query Q;
+    Q.row_index = n;
+    sim->initial_mesh(&sim->user, NULL, &Q);
+    int row_size = Q.row_size;
 
     /* Iteration variables for going over the linked list: */
     struct mesh_vert *VL, *VR;
@@ -299,8 +336,8 @@ void gusto_mesh_generate_verts(struct gusto_sim *sim)
       VL->col_index = 2*i + 0;
       VR->col_index = 2*i + 1;
 
-      sim->initial_mesh(&sim->user, VL);
-      sim->initial_mesh(&sim->user, VR);
+      sim->initial_mesh(&sim->user, VL, NULL);
+      sim->initial_mesh(&sim->user, VR, NULL);
 
       for (int d=0; d<4; ++d) { /* vertex velocities */
 	VL->v[d] = 0.0;

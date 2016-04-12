@@ -22,15 +22,12 @@ class GustoDataset(object):
             verts.append(coords)
         return verts
 
-    def get_cell_variable(self, key, flat=True):
+    def get_cell_variable(self, key):
         cells = [ ]
         for row in self.h5f['rows'].itervalues():
             var = row['cells'][key][:]
-            cells.append(var)
-        if cells:
-            return np.array(cells).flatten()
-        else:
-            return cells
+            cells += var.flat
+        return np.array(cells)
 
     def get_vert_variable(self, key, flat=True):
         verts = [ ]
