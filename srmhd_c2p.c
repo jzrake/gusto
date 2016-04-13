@@ -173,6 +173,9 @@ int srmhd_c2p_reconstruct_prim(srmhd_c2p *c2p, double Z, double W, double *Pout)
     P[pre] = c2p->PressureFloor;
     c2p->AppliedPressureFloor = 1;
   }
+  else if (P[pre] <= 0.0) {
+    printf("[srmhd_c2p] got negative pressure: p=%4.3e\n", P[pre]);
+  }
 
   int error = srmhd_c2p_check_prim(c2p, P);
   if (error) {

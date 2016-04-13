@@ -421,6 +421,7 @@ void gusto_mesh_generate_faces(struct gusto_sim *sim)
       F->verts[1] = VR;
       F->cells[0] = CL;
       F->cells[1] = CR;
+      F->face_type = 'l'; /* longitudinal face */
 
       DL_APPEND(sim->faces, F);
 
@@ -438,7 +439,7 @@ void gusto_mesh_generate_faces(struct gusto_sim *sim)
 
 
   /* ----------------------------------------------------------------------
-   * Add lateral faces.
+   * Add transverse faces.
    * ---------------------------------------------------------------------- */
   for (int n=0; n<sim->num_rows-1; ++n) {
 
@@ -526,6 +527,7 @@ void gusto_mesh_generate_faces(struct gusto_sim *sim)
       F->verts[1] = V1;
       F->cells[0] = Cm;
       F->cells[1] = Cp;
+      F->face_type = 't'; /* transverse face */
 
       VEC4_SUB2(V1->x, V0->x, dl);
 

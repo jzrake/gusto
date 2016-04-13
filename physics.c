@@ -193,6 +193,7 @@ void gusto_transmit_fluxes(struct gusto_sim *sim, double dt)
     struct mesh_cell *CR = F->cells[1];
 
     for (int q=0; q<5; ++q) {
+
       if (CL) CL->U[q] -= F->Fhat[q] * F->nhat[0] * dt;
       if (CR) CR->U[q] += F->Fhat[q] * F->nhat[0] * dt;
     }
@@ -459,14 +460,14 @@ int gusto_from_conserved(struct aux_variables *A, double U[8], double dA[4])
   A->magnetic_four_vector[3] = b3;
   gusto_complete_aux(A);
 
-  srmhd_c2p_del(c2p);
-
   if (error != 0) {
     printf("[gusto] ERROR: %s\n", srmhd_c2p_get_error(c2p, error));
     printf("[gusto] failed at on U = [%f %f %f %f %f %f %f %f]\n",
 	   Uin[0], Uin[1], Uin[2], Uin[3],
 	   Uin[4], Uin[5], Uin[6], Uin[7]);
   }
+
+  srmhd_c2p_del(c2p);
 
   return error;
 }
@@ -731,22 +732,6 @@ void bc_inflow(struct gusto_sim *sim)
       }
     }
   }
-  /* for (int n=0; n<sim->num_rows; ++n) { */
-  /*   struct mesh_cell *Cinner0 = sim->rows[n].cells; */
-  /*   struct mesh_cell *Couter0 = sim->rows[n].cells; */
-
-  /*   while (Couter0->next) Couter0 = Couter0->next; */
-
-  /*   gusto_default_aux(&Cinner0->aux[0]); */
-  /*   gusto_default_aux(&Couter0->aux[0]); */
-  /*   sim->initial_data(&sim->user, &Couter0->aux[0], Couter0->x); */
-  /*   sim->initial_data(&sim->user, &Cinner0->aux[0], Cinner0->x); */
-
-  /*   gusto_complete_aux(&Cinner0->aux[0]); */
-  /*   gusto_complete_aux(&Couter0->aux[0]); */
-  /*   gusto_to_conserved(&Cinner0->aux[0], Cinner0->U, Cinner0->dA); */
-  /*   gusto_to_conserved(&Couter0->aux[0], Couter0->U, Couter0->dA); */
-  /* } */
 }
 
 

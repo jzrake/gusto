@@ -68,6 +68,7 @@ struct mesh_vert
 
 struct mesh_face
 {
+  char face_type; /* l for longitudinal or t for transverse */
   double Fhat[8]; /* Godunov fluxes */
   double nhat[4]; /* 0: face area, 1,2,3: unit normal */
   double Bflux;   /* magnetic flux through face */
