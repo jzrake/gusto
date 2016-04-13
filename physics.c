@@ -59,6 +59,18 @@ void gusto_initial_data(struct gusto_sim *sim)
 	A->magnetic_four_vector[3] = b3;
 	gusto_complete_aux(A);
 	gusto_to_conserved(A, C->U, C->dA);
+
+	if (sim->user.validate_curl) {
+	  struct aux_variables A;
+	  double U[8];
+	  gusto_default_aux(&A);
+	  sim->initial_data(&sim->user, &A, C->x);
+	  gusto_complete_aux(&A);
+	  gusto_to_conserved(&A, U, C->dA);
+
+	  printf("BR = %f (%f) Bz = %f (%f) Bf = %f (%f)\n",
+		 C->U[B11], U[B11], C->U[B33], U[B33], C->U[B22]/C->dA[2], U[B22]/C->dA[2]);
+	}
       }
     }
   }
@@ -135,7 +147,13 @@ void gusto_compute_face_magnetic_flux(struct gusto_sim *sim)
   DL_FOREACH(sim->faces, F) {
     double A0 = F->verts[0]->aux[0].vector_potential;
     double A1 = F->verts[1]->aux[0].vector_potential;
-    F->Bflux = -A1 + A0; /* Flux is per length along the symmetry axis */
+    double R0 = F->verts[0]->aux[0].R;
+    double R1 = F->verts[1]->aux[0].R;
+
+    double dx[4] = VEC4_SUB(F->verts[1]->x, F->verts[0]->x);
+    double dl[4] = VEC4_CROSS(F->nhat, dx);
+
+    F->Bflux = dl[2] / fabs(dl[2]) * (A1*R1 - A0*R0);
   }
 }
 
@@ -190,8 +208,8 @@ void gusto_compute_cell_field_from_faces(struct gusto_sim *sim)
       double D[2][2] = { {+A[1][1]/det, -A[0][1]/det},
 			 {-A[1][0]/det, +A[0][0]/det} }; /* inverse of A matrix */
       double Phi[2] = {C->U[B11], C->U[B33]};
-      C->U[B11] = D[0][0] * Phi[0] + D[0][1] * Phi[1];
-      C->U[B33] = D[1][0] * Phi[0] + D[1][1] * Phi[1];
+      C->U[B11] = (D[0][0] * Phi[0] + D[0][1] * Phi[1]) / C->aux[0].R;
+      C->U[B33] = (D[1][0] * Phi[0] + D[1][1] * Phi[1]) / C->aux[0].R;
     }
   }
 }

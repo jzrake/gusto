@@ -27,6 +27,7 @@ user_struct = [
     ('sigma', 'double', 1.0),
     ('entropy', 'double', 1.0),
     ('curl_mode', 'char', '+'),
+    ('validate_curl', 'int', 0),
     ('advance_poloidal_field', 'int', 1),
 ]
 
