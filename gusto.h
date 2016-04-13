@@ -154,6 +154,8 @@ void gusto_initial_data(struct gusto_sim *sim);
 void gusto_compute_vertex_velocities(struct gusto_sim *sim);
 void gusto_compute_variables_at_vertices(struct gusto_sim *sim);
 void gusto_compute_fluxes(struct gusto_sim *sim);
+void gusto_compute_face_magnetic_flux(struct gusto_sim *sim);
+void gusto_compute_cell_field_from_faces(struct gusto_sim *sim);
 void gusto_compute_cell_magnetic_field(struct gusto_sim *sim);
 void gusto_transmit_fluxes(struct gusto_sim *sim, double dt);
 void gusto_advance_vector_potential(struct gusto_sim *sim, double dt);

@@ -40,7 +40,15 @@ void gusto_initial_data(struct gusto_sim *sim)
 
   if (sim->user.advance_poloidal_field) {
 
-    gusto_compute_cell_magnetic_field(sim);
+    if (sim->user.curl_mode == 'f') {
+      gusto_compute_face_magnetic_flux(sim);
+      gusto_compute_cell_field_from_faces(sim);
+    }
+    else if (sim->user.curl_mode == 'x' || sim->user.curl_mode == '+') {
+      gusto_compute_cell_magnetic_field(sim);
+    }
+
+    /* gusto_recover_variables(sim); */
 
     for (int n=0; n<sim->num_rows; ++n) {
       DL_FOREACH(sim->rows[n].cells, C) {
@@ -62,7 +70,6 @@ void gusto_initial_data(struct gusto_sim *sim)
     }
   }
 }
-
 
 
 void gusto_compute_fluxes(struct gusto_sim *sim)
@@ -118,6 +125,72 @@ void gusto_compute_fluxes(struct gusto_sim *sim)
     DL_FOREACH(sim->rows[n].verts, V) {
       V->Efield /= V->num_counts;
       V->num_counts = 0;
+    }
+  }
+}
+
+
+
+void gusto_compute_face_magnetic_flux(struct gusto_sim *sim)
+/*
+ * Evaluate the magnetic flux through faces by application of Stokes' theorem to
+ * the vector potential (along the symmetry axis) at the face end-points.
+ */
+{
+  struct mesh_face *F;
+  DL_FOREACH(sim->faces, F) {
+    double A0 = F->verts[0]->aux[0].vector_potential;
+    double A1 = F->verts[1]->aux[0].vector_potential;
+    if (sim->user.coordinates == 'c' ||
+	sim->user.coordinates == 's') {
+      double R0 = F->verts[0]->aux[0].R;
+      double R1 = F->verts[1]->aux[0].R;
+      F->Bflux = 2 * M_PI * (R1 * A1 - R0 * A0);
+    }
+    else {
+      F->Bflux = A1 - A0;
+    }
+  }
+}
+
+
+
+void gusto_compute_cell_field_from_faces(struct gusto_sim *sim)
+{
+  struct mesh_cell *C;
+  struct mesh_face *F;
+
+  for (int n=0; n<sim->num_rows; ++n) {
+    DL_FOREACH(sim->rows[n].cells, C) {
+      C->U[B11] = 0.0;
+      C->U[B33] = 0.0;
+    }
+  }
+
+  DL_FOREACH(sim->faces, F) {
+
+    /*
+     * For the moment, the cell's conserved magnetic flux is counted with
+     * respect to its local coordinate system. Transverse faces are normal to
+     * the '1' (nominally R) direction and lateral faces are normal to the '3'
+     * (nominally z) direction. The factor of 1/2 comes from the fact that flux
+     * is counted twice, once for each of the cell's opposing walls.
+     */
+    if (F->face_type == 't') {
+      if (F->cells[0]) F->cells[0]->U[B11] += 0.5 * F->Bflux;
+      if (F->cells[1]) F->cells[1]->U[B11] += 0.5 * F->Bflux;
+    }
+    if (F->face_type == 'l') {
+      if (F->cells[0]) F->cells[0]->U[B33] += 0.5 * F->Bflux;
+      if (F->cells[1]) F->cells[1]->U[B33] += 0.5 * F->Bflux;
+    }
+  }
+
+  /* So far, this is exact when the cell's faces are coordinate-aligned. */
+
+  for (int n=0; n<sim->num_rows; ++n) {
+    DL_FOREACH(sim->rows[n].cells, C) {
+
     }
   }
 }
