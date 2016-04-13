@@ -74,6 +74,11 @@ void gusto_initial_data(struct gusto_sim *sim)
       }
     }
   }
+
+  if (sim->user.curl_mode == 'f') {
+    sim->boundary_con(sim); /* required since cells on the edge don't get
+			       correct field value */
+  }
 }
 
 

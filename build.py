@@ -24,6 +24,7 @@ user_struct = [
     ('density1', 'double', 1.0),
     ('fourvel0', 'double', 0.0),
     ('fourvel1', 'double', 0.0),
+    ('abc', 'double[3]', [1.0, 0.0, 1.0]),
     ('sigma', 'double', 1.0),
     ('entropy', 'double', 1.0),
     ('curl_mode', 'char', '+'),

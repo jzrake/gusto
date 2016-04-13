@@ -125,9 +125,9 @@ const char **id_abc_ff(struct gusto_user *user,
     return help;
   }
 
-  double a = 0.5;
-  double b = 0.0;
-  double c = 0.5;
+  double a = user->abc[0];
+  double b = user->abc[1];
+  double c = user->abc[2];
 
   double al = 2 * M_PI;
   double B1 = c * cos(X[3] * al) - b * sin(X[2] * al);

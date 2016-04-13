@@ -20,6 +20,7 @@ struct gusto_user {
     double density1;
     double fourvel0;
     double fourvel1;
+    double abc[3];
     double sigma;
     double entropy;
     char curl_mode;
