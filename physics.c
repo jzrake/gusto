@@ -40,14 +40,7 @@ void gusto_initial_data(struct gusto_sim *sim)
 
   if (sim->user.advance_poloidal_field) {
 
-    if (sim->user.curl_mode == 'f') {
-      gusto_compute_face_magnetic_flux(sim);
-      gusto_compute_cell_field_from_faces(sim);
-    }
-    else if (sim->user.curl_mode == 'x' || sim->user.curl_mode == '+') {
-      gusto_compute_cell_magnetic_field(sim);
-    }
-
+    gusto_compute_cell_magnetic_field(sim);
     /* gusto_recover_variables(sim); */
 
     for (int n=0; n<sim->num_rows; ++n) {
@@ -57,8 +50,8 @@ void gusto_initial_data(struct gusto_sim *sim)
 	double u0 = A->velocity_four_vector[0];
 	double u1 = A->velocity_four_vector[1];
 	double u3 = A->velocity_four_vector[3];
-	double B1 = C->U[B11] / C->dA[1];
-	double B3 = C->U[B33] / C->dA[3];
+	double B1 = C->U[B11];
+	double B3 = C->U[B33];
 	double b1 = (B1 + b0 * u1) / u0;
 	double b3 = (B3 + b0 * u3) / u0;
 
@@ -70,6 +63,7 @@ void gusto_initial_data(struct gusto_sim *sim)
     }
   }
 }
+
 
 
 void gusto_compute_fluxes(struct gusto_sim *sim)
@@ -141,15 +135,7 @@ void gusto_compute_face_magnetic_flux(struct gusto_sim *sim)
   DL_FOREACH(sim->faces, F) {
     double A0 = F->verts[0]->aux[0].vector_potential;
     double A1 = F->verts[1]->aux[0].vector_potential;
-    if (sim->user.coordinates == 'c' ||
-	sim->user.coordinates == 's') {
-      double R0 = F->verts[0]->aux[0].R;
-      double R1 = F->verts[1]->aux[0].R;
-      F->Bflux = 2 * M_PI * (R1 * A1 - R0 * A0);
-    }
-    else {
-      F->Bflux = A1 - A0;
-    }
+    F->Bflux = -A1 + A0; /* Flux is per length along the symmetry axis */
   }
 }
 
@@ -167,15 +153,15 @@ void gusto_compute_cell_field_from_faces(struct gusto_sim *sim)
     }
   }
 
-  DL_FOREACH(sim->faces, F) {
 
-    /*
-     * For the moment, the cell's conserved magnetic flux is counted with
-     * respect to its local coordinate system. Transverse faces are normal to
-     * the '1' (nominally R) direction and lateral faces are normal to the '3'
-     * (nominally z) direction. The factor of 1/2 comes from the fact that flux
-     * is counted twice, once for each of the cell's opposing walls.
-     */
+  /*
+   * For the moment, the cell's conserved magnetic flux vector Phi is counted
+   * with respect to its local coordinate system. Transverse faces are normal to
+   * the '1' (nominally R) direction and lateral faces are normal to the '3'
+   * (nominally z) direction. The factor of 1/2 comes from the fact that flux is
+   * counted twice, once for each of the cell's opposing walls.
+   */
+  DL_FOREACH(sim->faces, F) {
     if (F->face_type == 't') {
       if (F->cells[0]) F->cells[0]->U[B11] += 0.5 * F->Bflux;
       if (F->cells[1]) F->cells[1]->U[B11] += 0.5 * F->Bflux;
@@ -186,11 +172,26 @@ void gusto_compute_cell_field_from_faces(struct gusto_sim *sim)
     }
   }
 
-  /* So far, this is exact when the cell's faces are coordinate-aligned. */
+
+  /*
+   * The flux vector just computed is exact when the cell's faces are
+   * coordinate-aligned. The components of Phi are with respect to the cell's
+   * area forms dA1 and dA3, a basis that is in general not orthogonal, and
+   * misaligned with respect to (R,z). The following step rotates and scales the
+   * flux vector (B.dA1, B.dA3) into a magnetic field vector in the (R,z)
+   * basis.
+   */
 
   for (int n=0; n<sim->num_rows; ++n) {
     DL_FOREACH(sim->rows[n].cells, C) {
-
+      double A[2][2] = {{ C->dAR[1], C->dAR[3] },
+			{ C->dAz[1], C->dAz[3] }};
+      double det = A[0][0] * A[1][1] - A[0][1] * A[1][0];
+      double D[2][2] = { {+A[1][1]/det, -A[0][1]/det},
+			 {-A[1][0]/det, +A[0][0]/det} }; /* inverse of A matrix */
+      double Phi[2] = {C->U[B11], C->U[B33]};
+      C->U[B11] = D[0][0] * Phi[0] + D[0][1] * Phi[1];
+      C->U[B33] = D[1][0] * Phi[0] + D[1][1] * Phi[1];
     }
   }
 }
@@ -201,11 +202,15 @@ void gusto_compute_cell_magnetic_field(struct gusto_sim *sim)
 /*
  * Evaluate the poloidal (in-plane) magnetic field at the cell centers from the
  * toroidal vector potential A.phi stored at cell vertices. The operation leaves
- * the result in U[B11] and U[B33], which are magnetic fluxes, being multiplied
- * by the nominal cell cross-sections dA[1] and dA[3] to be consistent with the
- * convention used for the toroidal (out-of-plane) field.
+ * the result in U[B11] and U[B33].
  */
 {
+  if (sim->user.curl_mode == 'f') {
+    gusto_compute_face_magnetic_flux(sim);
+    gusto_compute_cell_field_from_faces(sim);
+    return;
+  }
+
   struct mesh_cell *C;
 
   for (int n=0; n<sim->num_rows; ++n) {
@@ -240,16 +245,16 @@ void gusto_compute_cell_magnetic_field(struct gusto_sim *sim)
 	gusto_curlA1(C, 1, 3, 0, crlA1);
 	gusto_curlA1(C, 2, 0, 3, crlA2);
 	gusto_curlA1(C, 3, 2, 1, crlA3);
-	C->U[B11] = (crlA0[0] + crlA1[0] + crlA2[0] + crlA3[0]) / 4 * C->dA[1];
-	C->U[B33] = (crlA0[1] + crlA1[1] + crlA2[1] + crlA3[1]) / 4 * C->dA[3];
+	C->U[B11] = (crlA0[0] + crlA1[0] + crlA2[0] + crlA3[0]) / 4;
+	C->U[B33] = (crlA0[1] + crlA1[1] + crlA2[1] + crlA3[1]) / 4;
       }
       else if (sim->user.curl_mode == 'x') {
 	/* Evaluate curl A using all four vertices at once to get one estimate
 	   at (or near) the cell center. */
 	double crlA[2];
 	gusto_curlA2(C, crlA);
-	C->U[B11] = crlA[0] * C->dA[1];
-	C->U[B33] = crlA[1] * C->dA[3];
+	C->U[B11] = crlA[0];
+	C->U[B33] = crlA[1];
       }
     }
   }
@@ -266,7 +271,6 @@ void gusto_transmit_fluxes(struct gusto_sim *sim, double dt)
     struct mesh_cell *CR = F->cells[1];
 
     for (int q=0; q<5; ++q) {
-
       if (CL) CL->U[q] -= F->Fhat[q] * F->nhat[0] * dt;
       if (CR) CR->U[q] += F->Fhat[q] * F->nhat[0] * dt;
     }
@@ -473,9 +477,10 @@ void gusto_to_conserved(struct aux_variables *A, double U[8], double dA[4])
   U[S11] = dA[0] * (H0 * u0 * u1 - b0 * b1);
   U[S22] = dA[0] * (H0 * u0 * u2 - b0 * b2);
   U[S33] = dA[0] * (H0 * u0 * u3 - b0 * b3);
-  U[B11] = dA[1] * (b1 * u0 - u1 * b0);
+  U[B11] =          b1 * u0 - u1 * b0;
   U[B22] = dA[2] * (b2 * u0 - u2 * b0);
-  U[B33] = dA[3] * (b3 * u0 - u3 * b0);
+  U[B33] =          b3 * u0 - u3 * b0;
+  /* Note that B1 and B3 are point-wise and B2 is a flux */
 
   U[S22] *= A->R; /* R != 1 if in cylindrical coordinates */
 }
@@ -493,9 +498,9 @@ int gusto_from_conserved(struct aux_variables *A, double U[8], double dA[4])
   Uin[S11] = U[S11] / dA[0];
   Uin[S22] = U[S22] / dA[0];
   Uin[S33] = U[S33] / dA[0];
-  Uin[B11] = U[B11] / dA[1];
+  Uin[B11] = U[B11];
   Uin[B22] = U[B22] / dA[2]; /* toroidal field (along phi) */
-  Uin[B33] = U[B33] / dA[3]; /* poloidal field (along z) */
+  Uin[B33] = U[B33];
 
   Uin[S22] /= A->R;
 

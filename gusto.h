@@ -84,7 +84,8 @@ struct mesh_cell
   char cell_type;
   double x[4];
   double dA[4];                /* 0: volume, dA1, dA2, dA3: cross-sections */
-  double zhat[4];              /* 1,2,3: cell's longitudinal axis (unit) */
+  double dAR[4];
+  double dAz[4];
   double U[8];                 /* total mass, energy, momentum, magnetic flux */
   double weightA;
   double weightB;

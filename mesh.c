@@ -631,13 +631,15 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
 	C->aux[0].R = 1.0;
       }
 
-      /* Cell's longitudinal axis */
-      C->zhat[0] = 0.0;
-      C->zhat[1] = 0.5 * (dAz0[1] + dAz1[1]);
-      C->zhat[2] = 0.5 * (dAz0[2] + dAz1[2]);
-      C->zhat[3] = 0.5 * (dAz0[3] + dAz1[3]);
-      VEC4_NORMALIZE(C->zhat);
+      C->dAR[0] = 0.0;
+      C->dAR[1] = 0.5 * (dAR0[1] + dAR1[1]);
+      C->dAR[2] = 0.5 * (dAR0[2] + dAR1[2]);
+      C->dAR[3] = 0.5 * (dAR0[3] + dAR1[3]);
 
+      C->dAz[0] = 0.0;
+      C->dAz[1] = 0.5 * (dAz0[1] + dAz1[1]);
+      C->dAz[2] = 0.5 * (dAz0[2] + dAz1[2]);
+      C->dAz[3] = 0.5 * (dAz0[3] + dAz1[3]);
 
       double dAR = gusto_min3(VEC4_MOD(dAR0), VEC4_MOD(dAR1), 1.0);
       double dAz = gusto_min3(VEC4_MOD(dAz0), VEC4_MOD(dAz1), 1.0);
