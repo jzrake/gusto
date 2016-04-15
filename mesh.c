@@ -677,9 +677,34 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
 
 
 
-    /* This ensures that the face's normal vector points from cells[0] ->
-       cells[1]. */
+    /*
+     *
+     * The following ensures that the face's normal vector n-hat points from
+     * cells[0] -> cells[1], and that the vectors l-hat (from verts[0] ->
+     * verts[1]) and n-hat have a cross-product along phi-hat:
+     *
+     *
+     *                         l x n = f
+     *
+     *
+     *                            [c1]
+     *
+     *                             ^ n-hat
+     *                             |
+     *                             |
+     *                             |
+     *     (x) f-hat    +----------------------+
+     *                 v0      --l-hat-->      v1
+     *
+     *
+     *
+     *                            [c0]
+     *
+     *
+     */
+
     double dz[4] = {0,0,0,0};
+
     if (F->cells[0] && F->cells[1]) {
       VEC4_SUB2(F->cells[1]->x, F->cells[0]->x, dz);
     }
@@ -689,10 +714,21 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
     else if (F->cells[1]) {
       VEC4_SUB2(F->cells[1]->x, x0, dz);
     }
+
+
     if (VEC4_DOT(dz, F->nhat) < 0.0) {
       F->nhat[1] *= -1;
       F->nhat[2] *= -1;
       F->nhat[3] *= -1;
+    }
+
+
+    double lhat[4] = VEC4_SUB(F->verts[1]->x, F->verts[0]->x);
+    double lcrossn[4] = VEC4_CROSS(lhat, F->nhat);
+    if (lcrossn[2] < 0) {
+      struct mesh_vert *V0 = F->verts[0];
+      F->verts[0] = F->verts[1];
+      F->verts[1] = V0;
     }
   }
 }

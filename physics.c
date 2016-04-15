@@ -69,7 +69,8 @@ void gusto_initial_data(struct gusto_sim *sim)
 	  gusto_to_conserved(&A, U, C->dA);
 
 	  printf("BR = %f (%f) Bz = %f (%f) Bf = %f (%f)\n",
-		 C->U[B11], U[B11], C->U[B33], U[B33], C->U[B22]/C->dA[2], U[B22]/C->dA[2]);
+		 C->U[B11], U[B11], C->U[B33],
+		 U[B33], C->U[B22]/C->dA[2], U[B22]/C->dA[2]);
 	}
       }
     }
@@ -122,9 +123,42 @@ void gusto_compute_fluxes(struct gusto_sim *sim)
      *
      * where dx is the unit vector from x0 -> x1.
      */
-    double df[4] = {0, 0, 1, 0};
-    double dx[4] = VEC4_CROSS(F->nhat, df); /* unit vector from x0 -> x1 */
-    double ef = dx[1] * F->Fhat[B11] + dx[3] * F->Fhat[B33];
+
+    double ef = 0.0;
+
+    if (sim->user.emf_mode == 'r') { /* use the Godunov flux */
+      double df[4] = {0, 0, 1, 0};
+      double dx[4] = VEC4_CROSS(F->nhat, df); /* unit vector from x0 -> x1 */
+      ef = dx[1] * F->Fhat[B11] + dx[3] * F->Fhat[B33];
+    }
+    else if (sim->user.emf_mode == 'a') { /* average E from left and right cells */
+      int num = 0;
+      if (CL) {
+	double *u = CL->aux[0].velocity_four_vector;
+	double *b = CL->aux[0].magnetic_four_vector;
+	double B[4] = {0,
+		       b[1] * u[0] - b[0] * u[1],
+		       b[2] * u[0] - b[0] * u[2],
+		       b[3] * u[0] - b[0] * u[3]};
+	double v[4] = {0, u[1]/u[0], u[2]/u[0], u[3]/u[0]};
+	double E[4] = VEC4_CROSS(B, v);
+	ef += E[2];
+	num += 1;
+      }
+      if (CR) {
+	double *u = CR->aux[0].velocity_four_vector;
+	double *b = CR->aux[0].magnetic_four_vector;
+	double B[4] = {0,
+		       b[1] * u[0] - b[0] * u[1],
+		       b[2] * u[0] - b[0] * u[2],
+		       b[3] * u[0] - b[0] * u[3]};
+	double v[4] = {0, u[1]/u[0], u[2]/u[0], u[3]/u[0]};
+	double E[4] = VEC4_CROSS(B, v);
+	ef += E[2];
+	num += 1;
+      }
+      ef /= num;
+    }
 
     F->verts[0]->Efield += ef;
     F->verts[1]->Efield += ef;
@@ -146,6 +180,9 @@ void gusto_compute_face_magnetic_flux(struct gusto_sim *sim)
 /*
  * Evaluate the magnetic flux through faces by application of Stokes' theorem to
  * the vector potential (along the symmetry axis) at the face end-points.
+ *
+ * The sign of magnetic flux is given by the convention l x n = f, where l
+ * points from v0 to v1, n from c0 to c1, f is phi-hat, and Bflux = B.n dA.
  */
 {
   struct mesh_face *F;
@@ -155,10 +192,7 @@ void gusto_compute_face_magnetic_flux(struct gusto_sim *sim)
     double R0 = F->verts[0]->aux[0].R;
     double R1 = F->verts[1]->aux[0].R;
 
-    double dx[4] = VEC4_SUB(F->verts[1]->x, F->verts[0]->x);
-    double dl[4] = VEC4_CROSS(F->nhat, dx);
-
-    F->Bflux = dl[2] / fabs(dl[2]) * (A1*R1 - A0*R0);
+    F->Bflux = A0*R0 - A1*R1;
   }
 }
 
