@@ -725,7 +725,8 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
 
     double lhat[4] = VEC4_SUB(F->verts[1]->x, F->verts[0]->x);
     double lcrossn[4] = VEC4_CROSS(lhat, F->nhat);
-    if (lcrossn[2] < 0) {
+
+    if (lcrossn[2] < 0.0) {
       struct mesh_vert *V0 = F->verts[0];
       F->verts[0] = F->verts[1];
       F->verts[1] = V0;

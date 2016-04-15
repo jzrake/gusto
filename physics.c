@@ -105,15 +105,50 @@ void gusto_compute_fluxes(struct gusto_sim *sim)
     double *v1 = F->verts[1]->v;
     double vpar = 0.5 * (VEC4_DOT(v0, F->nhat) + VEC4_DOT(v1, F->nhat));
 
+
+    struct aux_variables AL, AR;
     if (CL && CR) {
-      gusto_riemann(CL->aux, CR->aux, F->nhat, F->Fhat, vpar);
+      AL = CL->aux[0];
+      AR = CR->aux[0];
     }
     else if (CL) {
-      gusto_riemann(CL->aux, CL->aux, F->nhat, F->Fhat, vpar);
+      AL = CL->aux[0];
+      AR = CL->aux[0];
     }
     else if (CR) {
-      gusto_riemann(CR->aux, CR->aux, F->nhat, F->Fhat, vpar);
+      AL = CR->aux[0];
+      AR = CR->aux[0];
     }
+
+
+    double dA_unit[4] = {1, 1, 1, 1};
+    double UL[8], UR[8];
+    gusto_to_conserved(&AL, UL, dA_unit);
+    gusto_to_conserved(&AR, UR, dA_unit);
+
+    double *nhat = F->nhat;
+    double lhat[4] = VEC4_SUB(F->verts[1]->x, F->verts[0]->x); VEC4_NORMALIZE(lhat);
+    double B1L = UL[B11];
+    double B3L = UL[B33];
+    double B1R = UR[B11];
+    double B3R = UR[B33];
+    double BparL = lhat[1] * B1L + lhat[3] * B3L;
+    double BparR = lhat[1] * B1R + lhat[3] * B3R;
+    double BperL = nhat[1] * B1L + nhat[3] * B3L;
+    double BperR = nhat[1] * B1R + nhat[3] * B3R;
+    double Bperp = 0.5 * (BperL + BperR);
+
+    UL[B11] = Bperp * F->nhat[1] + BparL * lhat[1];
+    UL[B33] = Bperp * F->nhat[3] + BparL * lhat[3];
+    UR[B11] = Bperp * F->nhat[1] + BparR * lhat[1];
+    UR[B33] = Bperp * F->nhat[3] + BparR * lhat[3];
+
+
+    gusto_from_conserved(&AL, UL, dA_unit);
+    gusto_from_conserved(&AR, UR, dA_unit);
+    gusto_riemann(&AL, &AR, F->nhat, F->Fhat, vpar);
+
+
 
     /*
      * Compute electric field at the face endpoints (x0, x1) from the Godunov
@@ -187,6 +222,7 @@ void gusto_compute_face_magnetic_flux(struct gusto_sim *sim)
 {
   struct mesh_face *F;
   DL_FOREACH(sim->faces, F) {
+
     double A0 = F->verts[0]->aux[0].vector_potential;
     double A1 = F->verts[1]->aux[0].vector_potential;
     double R0 = F->verts[0]->aux[0].R;
