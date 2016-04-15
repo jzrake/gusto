@@ -28,7 +28,6 @@ user_struct = [
     ('sigma', 'double', 1.0),
     ('entropy', 'double', 1.0),
     ('curl_mode', 'char', '+'), # x, +, f
-    ('emf_mode', 'char', 'r'),  # r, a for Riemann or average
     ('validate_curl', 'int', 0),
     ('advance_poloidal_field', 'int', 1),
 ]

@@ -105,7 +105,6 @@ void gusto_compute_fluxes(struct gusto_sim *sim)
     double *v1 = F->verts[1]->v;
     double vpar = 0.5 * (VEC4_DOT(v0, F->nhat) + VEC4_DOT(v1, F->nhat));
 
-
     struct aux_variables AL, AR;
     if (CL && CR) {
       AL = CL->aux[0];
@@ -120,32 +119,6 @@ void gusto_compute_fluxes(struct gusto_sim *sim)
       AR = CR->aux[0];
     }
 
-
-    double dA_unit[4] = {1, 1, 1, 1};
-    double UL[8], UR[8];
-    gusto_to_conserved(&AL, UL, dA_unit);
-    gusto_to_conserved(&AR, UR, dA_unit);
-
-    double *nhat = F->nhat;
-    double lhat[4] = VEC4_SUB(F->verts[1]->x, F->verts[0]->x); VEC4_NORMALIZE(lhat);
-    double B1L = UL[B11];
-    double B3L = UL[B33];
-    double B1R = UR[B11];
-    double B3R = UR[B33];
-    double BparL = lhat[1] * B1L + lhat[3] * B3L;
-    double BparR = lhat[1] * B1R + lhat[3] * B3R;
-    double BperL = nhat[1] * B1L + nhat[3] * B3L;
-    double BperR = nhat[1] * B1R + nhat[3] * B3R;
-    double Bperp = 0.5 * (BperL + BperR);
-
-    UL[B11] = Bperp * F->nhat[1] + BparL * lhat[1];
-    UL[B33] = Bperp * F->nhat[3] + BparL * lhat[3];
-    UR[B11] = Bperp * F->nhat[1] + BparR * lhat[1];
-    UR[B33] = Bperp * F->nhat[3] + BparR * lhat[3];
-
-
-    gusto_from_conserved(&AL, UL, dA_unit);
-    gusto_from_conserved(&AR, UR, dA_unit);
     gusto_riemann(&AL, &AR, F->nhat, F->Fhat, vpar);
 
 
@@ -159,41 +132,17 @@ void gusto_compute_fluxes(struct gusto_sim *sim)
      * where dx is the unit vector from x0 -> x1.
      */
 
-    double ef = 0.0;
+    double df[4] = {0, 0, 1, 0};
+    double dx[4] = VEC4_CROSS(F->nhat, df); /* unit vector from x0 -> x1 */
+    double EL[4];
+    double ER[4];
 
-    if (sim->user.emf_mode == 'r') { /* use the Godunov flux */
-      double df[4] = {0, 0, 1, 0};
-      double dx[4] = VEC4_CROSS(F->nhat, df); /* unit vector from x0 -> x1 */
-      ef = dx[1] * F->Fhat[B11] + dx[3] * F->Fhat[B33];
-    }
-    else if (sim->user.emf_mode == 'a') { /* average E from left and right cells */
-      int num = 0;
-      if (CL) {
-	double *u = CL->aux[0].velocity_four_vector;
-	double *b = CL->aux[0].magnetic_four_vector;
-	double B[4] = {0,
-		       b[1] * u[0] - b[0] * u[1],
-		       b[2] * u[0] - b[0] * u[2],
-		       b[3] * u[0] - b[0] * u[3]};
-	double v[4] = {0, u[1]/u[0], u[2]/u[0], u[3]/u[0]};
-	double E[4] = VEC4_CROSS(B, v);
-	ef += E[2];
-	num += 1;
-      }
-      if (CR) {
-	double *u = CR->aux[0].velocity_four_vector;
-	double *b = CR->aux[0].magnetic_four_vector;
-	double B[4] = {0,
-		       b[1] * u[0] - b[0] * u[1],
-		       b[2] * u[0] - b[0] * u[2],
-		       b[3] * u[0] - b[0] * u[3]};
-	double v[4] = {0, u[1]/u[0], u[2]/u[0], u[3]/u[0]};
-	double E[4] = VEC4_CROSS(B, v);
-	ef += E[2];
-	num += 1;
-      }
-      ef /= num;
-    }
+    gusto_electric_field(&AL, EL);
+    gusto_electric_field(&AR, ER);
+
+    double ef_face = dx[1] * F->Fhat[B11] + dx[3] * F->Fhat[B33];
+    double ef_cell = 0.5 * (EL[2] + ER[2]);
+    double ef = 0.75 * ef_cell + 0.25 * ef_face;
 
     F->verts[0]->Efield += ef;
     F->verts[1]->Efield += ef;
@@ -773,6 +722,23 @@ void gusto_spherical_source_terms(struct aux_variables *A, double Udot[8])
   /* This is intended to be used for 1D meshes, and is valid only on the
      equatorial plane. */
   Udot[S11] = (2*(pg + pb) + u[2]*u[2]*H0 - b[2]*b[2]) / A->R;
+}
+
+
+
+void gusto_electric_field(struct aux_variables *A, double E[4])
+{
+  double *u = A->velocity_four_vector;
+  double *b = A->magnetic_four_vector;
+  double B[4] = {0,
+		 b[1] * u[0] - b[0] * u[1],
+		 b[2] * u[0] - b[0] * u[2],
+		 b[3] * u[0] - b[0] * u[3]};
+  double v[4] = {0, u[1]/u[0], u[2]/u[0], u[3]/u[0]};
+  double F[4] = VEC4_CROSS(B, v);
+  E[1] = F[1];
+  E[2] = F[2];
+  E[3] = F[3];
 }
 
 

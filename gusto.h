@@ -143,6 +143,7 @@ void gusto_default_aux(struct aux_variables *A);
 void gusto_complete_aux(struct aux_variables *A);
 void gusto_cylindrical_source_terms(struct aux_variables *A, double Udot[8]);
 void gusto_spherical_source_terms(struct aux_variables *A, double Udot[8]);
+void gusto_electric_field(struct aux_variables *A, double E[4]);
 int gusto_from_conserved(struct aux_variables *A, double U[8], double dA[4]);
 int gusto_wavespeeds(struct aux_variables *A, double n[4], double evals[8]);
 int gusto_fluxes(struct aux_variables *A, double n[4], double F[8]);
