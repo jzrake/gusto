@@ -9,6 +9,7 @@ struct gusto_user {
     int ng[2];
     double domain[4];
     char coordinates;
+    int rk_order;
     int move_cells;
     double mesh_stagger;
     char boundary_con[256];

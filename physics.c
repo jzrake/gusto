@@ -23,6 +23,7 @@ void gusto_initial_data(struct gusto_sim *sim)
       A = &V->aux[0];
       gusto_default_aux(A);
       sim->initial_data(&sim->user, A, V->x);
+      V->A = A->vector_potential;
     }
 
     /* Cell initial data is used to get everything else. The aux variables are
@@ -172,8 +173,8 @@ void gusto_compute_face_magnetic_flux(struct gusto_sim *sim)
   struct mesh_face *F;
   DL_FOREACH(sim->faces, F) {
 
-    double A0 = F->verts[0]->aux[0].vector_potential;
-    double A1 = F->verts[1]->aux[0].vector_potential;
+    double A0 = F->verts[0]->A;
+    double A1 = F->verts[1]->A;
     double R0 = F->verts[0]->aux[0].R;
     double R1 = F->verts[1]->aux[0].R;
 
@@ -244,16 +245,18 @@ void gusto_compute_cell_magnetic_field(struct gusto_sim *sim)
 /*
  * Evaluate the poloidal (in-plane) magnetic field at the cell centers from the
  * toroidal vector potential A.phi stored at cell vertices. The operation leaves
- * the result in U[B11] and U[B33].
+ * the result in U[B11] and U[B33]. Also, this operation should compute the flux
+ * function Y = R A-phi and leave it in the cell's aux.vector_potential data.
  */
 {
+  struct mesh_cell *C;
+
+
   if (sim->user.curl_mode == 'f') {
     gusto_compute_face_magnetic_flux(sim);
     gusto_compute_cell_field_from_faces(sim);
-    return;
   }
 
-  struct mesh_cell *C;
 
   for (int n=0; n<sim->num_rows; ++n) {
     DL_FOREACH(sim->rows[n].cells, C) {
@@ -270,10 +273,10 @@ void gusto_compute_cell_magnetic_field(struct gusto_sim *sim)
        * + : [curl(0,1;0,2) + curl(1,3;1,0) + curl(2,0;2,3) + curl(3,2;3,1)] / 4
        */
 
-      double Y = 0.25 * C->aux[0].R * (C->verts[0]->aux[0].vector_potential +
-				       C->verts[1]->aux[0].vector_potential +
-				       C->verts[2]->aux[0].vector_potential +
-				       C->verts[3]->aux[0].vector_potential);
+      double Y = 0.25 * C->aux[0].R * (C->verts[0]->A +
+				       C->verts[1]->A +
+				       C->verts[2]->A +
+				       C->verts[3]->A);
       C->aux[0].vector_potential = Y;
 
       if (sim->user.curl_mode == '+') {
@@ -297,6 +300,50 @@ void gusto_compute_cell_magnetic_field(struct gusto_sim *sim)
 	gusto_curlA2(C, crlA);
 	C->U[B11] = crlA[0];
 	C->U[B33] = crlA[1];
+      }
+    }
+  }
+}
+
+
+
+void gusto_cache_rk(struct gusto_sim *sim)
+{
+  struct mesh_cell *C;
+  struct mesh_vert *V;
+
+  for (int n=0; n<sim->num_rows; ++n) {
+    DL_FOREACH(sim->rows[n].cells, C) {
+      for (int q=0; q<5; ++q) {
+	C->U_rk[q] = C->U[q];
+      }
+    }
+    DL_FOREACH(sim->rows[n].verts, V) {
+      V->A_rk = V->A;
+      for (int d=0; d<4; ++d) {
+	V->x_rk[d] = V->x[d];
+      }
+    }
+  }
+}
+
+
+
+void gusto_average_rk(struct gusto_sim *sim, double b)
+{
+  struct mesh_cell *C;
+  struct mesh_vert *V;
+
+  for (int n=0; n<sim->num_rows; ++n) {
+    DL_FOREACH(sim->rows[n].cells, C) {
+      for (int q=0; q<5; ++q) {
+	C->U[q] = b * C->U[q] + (1 - b) * C->U_rk[q];
+      }
+    }
+    DL_FOREACH(sim->rows[n].verts, V) {
+      V->A = b * V->A + (1 - b) * V->A_rk;
+      for (int d=0; d<4; ++d) {
+	V->x[d] = b * V->x[d] + (1 - b) * V->x_rk[d];
       }
     }
   }
@@ -341,7 +388,7 @@ void gusto_advance_vector_potential(struct gusto_sim *sim, double dt)
 
   for (int n=0; n<sim->num_rows; ++n) {
     DL_FOREACH(sim->rows[n].verts, V) {
-      V->aux[0].vector_potential -= V->Efield * dt;
+      V->A -= V->Efield * dt;
     }
   }
 }
@@ -399,14 +446,6 @@ void gusto_compute_vertex_velocities(struct gusto_sim *sim)
       V->v[1] = u[1] / u[0];
       V->v[2] = u[2] / u[0];
       V->v[3] = u[3] / u[0];
-
-      /* double u[4] = {0, sim->user.fourvel1, 0, 0}; */
-      /* u[0] = sqrt(1 + u[1]*u[1]); */
-
-      /* V->v[1] = u[1] / u[0]; */
-      /* V->v[2] = u[2] / u[0]; */
-      /* V->v[3] = u[3] / u[0]; */
-
     }
   }
 }
@@ -464,7 +503,7 @@ void gusto_default_aux(struct aux_variables *A)
 
 void gusto_complete_aux(struct aux_variables *A)
 /*
- * Fills out all primitive variables provided the following are already valid:
+ * Fill out all primitive variables provided the following are already valid:
  *
  * u1, u2, u3
  * b1, b2, b3

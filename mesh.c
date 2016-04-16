@@ -283,7 +283,6 @@ OpInitialMesh gusto_lookup_initial_mesh(const char *user_key)
 
 void gusto_mesh_generate_verts(struct gusto_sim *sim)
 {
-  //int row_size = sim->user.N[0];
   int ngz = sim->user.ng[0]; /* number of ghost cells in the long direction */
   int ngR = sim->user.ng[1]; /* number of ghost cells in the tran direction */
 

@@ -57,6 +57,58 @@ void gusto_print_help(struct gusto_sim *sim)
 }
 
 
+
+void gusto_advance_rk(struct gusto_sim *sim, double dt, double rkparam)
+{
+  /*
+   * Evaluate derived data associated with the input state: vertex velocities,
+   * Godunov fluxes, electric fields.
+   * ---------------------------------------------------------------------------
+   */
+  if (sim->user.move_cells) {
+    gusto_compute_variables_at_vertices(sim);
+    gusto_compute_vertex_velocities(sim);
+  }
+  gusto_compute_fluxes(sim);
+
+  /*
+   * Update conserved quantities, vector potential, and vertex locations.
+   * ---------------------------------------------------------------------------
+   */
+  gusto_transmit_fluxes(sim, dt);
+  gusto_add_source_terms(sim, dt);
+
+  if (sim->user.advance_poloidal_field) {
+    gusto_advance_vector_potential(sim, dt);
+  }
+
+  if (sim->user.move_cells) {
+    gusto_mesh_advance_vertices(sim, dt);
+    gusto_mesh_generate_faces(sim);
+    gusto_mesh_compute_geometry(sim);
+  }
+
+  /*
+   * Correct conserved quantities, vector potential, and vertex locations for
+   * Runge-Kutta parameter.
+   * ---------------------------------------------------------------------------
+   */
+  gusto_average_rk(sim, rkparam);
+
+  /*
+   * Recover primitive variables from the new conserved variables and vector
+   * potential, enforce boundary condtitions.
+   * ---------------------------------------------------------------------------
+   */
+  if (sim->user.advance_poloidal_field) {
+    gusto_compute_cell_magnetic_field(sim);
+  }
+  gusto_recover_variables(sim);
+  sim->boundary_con(sim);
+}
+
+
+
 /*
  * Main function
  * =====================================================================
@@ -107,7 +159,7 @@ int main(int argc, char **argv)
 
   while (sim.status.time_simulation < sim.user.tmax) {
 
-    double dt = 0.25 * sim.smallest_cell_length;
+    double dt = 0.5 * sim.smallest_cell_length;
     sim.status.time_step = dt;
 
     /*
@@ -125,31 +177,22 @@ int main(int argc, char **argv)
 
     void *start_cycle = gusto_start_clock();
 
-    if (sim.user.move_cells) {
-      gusto_compute_variables_at_vertices(&sim);
-      gusto_compute_vertex_velocities(&sim);
+    gusto_cache_rk(&sim);
+
+    switch (sim.user.rk_order) {
+    case 1:
+      gusto_advance_rk(&sim, dt, 1.);
+      break;
+    case 2:
+      gusto_advance_rk(&sim, dt, 1.);
+      gusto_advance_rk(&sim, dt, 1./2);
+      break;
+    case 3:
+      gusto_advance_rk(&sim, dt, 1.);
+      gusto_advance_rk(&sim, dt, 1./4);
+      gusto_advance_rk(&sim, dt, 2./3);
+      break;
     }
-
-    gusto_compute_fluxes(&sim);
-    gusto_transmit_fluxes(&sim, dt);
-    gusto_add_source_terms(&sim, dt);
-
-    if (sim.user.advance_poloidal_field) {
-      gusto_advance_vector_potential(&sim, dt);
-    }
-
-    if (sim.user.move_cells) {
-      gusto_mesh_advance_vertices(&sim, dt);
-      gusto_mesh_generate_faces(&sim);
-      gusto_mesh_compute_geometry(&sim);
-    }
-
-    if (sim.user.advance_poloidal_field) {
-      gusto_compute_cell_magnetic_field(&sim);
-    }
-
-    gusto_recover_variables(&sim);
-    sim.boundary_con(&sim);
 
     double seconds = gusto_stop_clock(start_cycle);
 

@@ -55,8 +55,11 @@ struct aux_variables
 struct mesh_vert
 {
   double x[4];
+  double x_rk[4];
   double v[4];
   double Efield;
+  double A;
+  double A_rk;
   int row_index;
   int col_index;
   int num_counts;
@@ -87,8 +90,7 @@ struct mesh_cell
   double dAR[4];
   double dAz[4];
   double U[8];                 /* total mass, energy, momentum, magnetic flux */
-  double weightA;
-  double weightB;
+  double U_rk[8];              /* cached copy of conserved variables (for RK) */
   struct mesh_vert *verts[4];
   struct aux_variables aux[5]; /* aux vars at different cell locations */
   struct mesh_cell *next;
@@ -132,7 +134,8 @@ void gusto_mesh_generate_cells(struct gusto_sim *sim);
 void gusto_mesh_generate_faces(struct gusto_sim *sim);
 void gusto_mesh_compute_geometry(struct gusto_sim *sim);
 void gusto_mesh_advance_vertices(struct gusto_sim *sim, double dt);
-
+void gusto_cache_rk(struct gusto_sim *sim);
+void gusto_average_rk(struct gusto_sim *sim, double b);
 
 
 /* Operations on one or more variable states */
