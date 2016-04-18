@@ -143,7 +143,8 @@ void gusto_compute_fluxes(struct gusto_sim *sim)
 
     double ef_face = dx[1] * F->Fhat[B11] + dx[3] * F->Fhat[B33];
     double ef_cell = 0.5 * (EL[2] + ER[2]);
-    double ef = 0.75 * ef_cell + 0.25 * ef_face;
+    //double ef = 0.75 * ef_cell + 0.25 * ef_face;
+    double ef = 0.0 * ef_cell + 1.0 * ef_face;
 
     F->verts[0]->Efield += ef;
     F->verts[1]->Efield += ef;
@@ -366,6 +367,60 @@ void gusto_transmit_fluxes(struct gusto_sim *sim, double dt)
 
     if (CL) CL->U[B22] -= F->Fhat[B22] * F->length * dt;
     if (CR) CR->U[B22] += F->Fhat[B22] * F->length * dt;
+  }
+}
+
+
+
+void gusto_smooth_electric_field(struct gusto_sim *sim)
+{
+  struct mesh_face *F;
+  struct mesh_cell *C;
+
+
+  for (int n=0; n<sim->num_rows; ++n) {
+    DL_FOREACH(sim->rows[n].cells, C) {
+      double dlm = sqrt(pow(C->verts[1]->x[1] - C->verts[0]->x[1], 2) +
+			pow(C->verts[1]->x[3] - C->verts[0]->x[3], 2));
+      double dlp = sqrt(pow(C->verts[3]->x[1] - C->verts[2]->x[1], 2) +
+			pow(C->verts[3]->x[3] - C->verts[2]->x[3], 2));
+      double dEm = C->verts[1]->Efield - C->verts[0]->Efield;
+      double dEp = C->verts[3]->Efield - C->verts[2]->Efield;
+      C->gradEm = dEm / dlm;
+      C->gradEp = dEp / dlp;
+    }
+  }
+
+
+  DL_FOREACH(sim->faces, F) {
+
+     /* We only care about the transverse faces. */
+    if (F->face_type != 't') continue;
+
+    /* There's no point averaging when the other side of the face has no
+       cell. */
+    if (F->cells[0] == NULL || F->cells[1] == NULL) continue;
+
+    double E0L = F->cells[0]->verts[2]->Efield;
+    double E0R = F->cells[1]->verts[0]->Efield;
+    double gradEL = F->cells[0]->gradEp;
+    double gradER = F->cells[1]->gradEm;
+
+    double *x = F->verts[0]->x;
+    double *x0L = F->cells[0]->verts[2]->x;
+    double *x0R = F->cells[1]->verts[0]->x;
+
+    double dlL = sqrt(pow(x[1] - x0L[1], 2) +
+		      pow(x[3] - x0L[3], 2));
+    double dlR = sqrt(pow(x[1] - x0R[1], 2) +
+		      pow(x[3] - x0R[3], 2));
+
+    double EL = E0L + dlL * gradEL;
+    double ER = E0R + dlR * gradER;
+
+    //printf("before: %f, after: %f dl L/R = [%f %f]\n", F->verts[0]->Efield, 0.5 * (EL + ER), dlL, dlR);
+
+    F->verts[0]->Efield = 0.5 * (EL + ER);
   }
 }
 

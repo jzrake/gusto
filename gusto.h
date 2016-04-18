@@ -91,6 +91,8 @@ struct mesh_cell
   double dAz[4];
   double U[8];                 /* total mass, energy, momentum, magnetic flux */
   double U_rk[8];              /* cached copy of conserved variables (for RK) */
+  double gradEm;               /* used for smoothing electric fields */
+  double gradEp;
   struct mesh_vert *verts[4];
   struct aux_variables aux[5]; /* aux vars at different cell locations */
   struct mesh_cell *next;
@@ -163,6 +165,7 @@ void gusto_compute_face_magnetic_flux(struct gusto_sim *sim);
 void gusto_compute_cell_field_from_faces(struct gusto_sim *sim);
 void gusto_compute_cell_magnetic_field(struct gusto_sim *sim);
 void gusto_transmit_fluxes(struct gusto_sim *sim, double dt);
+void gusto_smooth_electric_field(struct gusto_sim *sim);
 void gusto_advance_vector_potential(struct gusto_sim *sim, double dt);
 void gusto_add_source_terms(struct gusto_sim *sim, double dt);
 
