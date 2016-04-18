@@ -373,22 +373,23 @@ void gusto_mesh_generate_cells(struct gusto_sim *sim)
       C->verts[2] = VR; VR = VR->next->next;
       C->verts[3] = VR;
 
-      /* TODO: this only works when ng_col is 0 or 1 */
+      DL_APPEND(sim->rows[n].cells, C);
+    }
 
+    int num_cells = gusto_mesh_count(sim, 'c', n);
+    DL_FOREACH(sim->rows[n].cells, C) {
       if (n < ng_row || n >= sim->num_rows - ng_row) {
 	C->cell_type = 'g';
       }
-      else if (ng_col == 1 && C->verts[0]->col_index == 0) {
+      else if (C->verts[0]->col_index / 2 < ng_col) {
 	C->cell_type = 'g';
       }
-      else if (ng_col == 1 && C->verts[3]->next == NULL) {
+      else if (num_cells - C->verts[0]->col_index / 2 <= ng_col) {
 	C->cell_type = 'g';
       }
       else {
 	C->cell_type = 'i';
       }
-
-      DL_APPEND(sim->rows[n].cells, C);
     }
   }
 }
