@@ -70,7 +70,11 @@ void gusto_advance_rk(struct gusto_sim *sim, double dt, double rkparam)
     gusto_compute_vertex_velocities(sim);
   }
   gusto_compute_fluxes(sim);
-  gusto_smooth_electric_field(sim);
+
+  if (sim->user.emf_smooth) {
+    gusto_smooth_electric_field(sim);
+  }
+
 
   /*
    * Update conserved quantities, vector potential, and vertex locations.

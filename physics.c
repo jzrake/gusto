@@ -133,6 +133,7 @@ void gusto_compute_fluxes(struct gusto_sim *sim)
      * where dx is the unit vector from x0 -> x1.
      */
 
+    double A = sim->user.emf_param;
     double df[4] = {0, 0, 1, 0};
     double dx[4] = VEC4_CROSS(F->nhat, df); /* unit vector from x0 -> x1 */
     double EL[4];
@@ -143,8 +144,7 @@ void gusto_compute_fluxes(struct gusto_sim *sim)
 
     double ef_face = dx[1] * F->Fhat[B11] + dx[3] * F->Fhat[B33];
     double ef_cell = 0.5 * (EL[2] + ER[2]);
-    //double ef = 0.75 * ef_cell + 0.25 * ef_face;
-    double ef = 0.0 * ef_cell + 1.0 * ef_face;
+    double ef = (1 - A) * ef_cell + A * ef_face;
 
     F->verts[0]->Efield += ef;
     F->verts[1]->Efield += ef;
@@ -410,15 +410,13 @@ void gusto_smooth_electric_field(struct gusto_sim *sim)
     double *x0L = F->cells[0]->verts[2]->x;
     double *x0R = F->cells[1]->verts[0]->x;
 
-    double dlL = sqrt(pow(x[1] - x0L[1], 2) +
-		      pow(x[3] - x0L[3], 2));
-    double dlR = sqrt(pow(x[1] - x0R[1], 2) +
-		      pow(x[3] - x0R[3], 2));
+    double dlL = sqrt(pow(x[1] - x0L[1], 2) + pow(x[3] - x0L[3], 2));
+    double dlR = sqrt(pow(x[1] - x0R[1], 2) + pow(x[3] - x0R[3], 2));
 
     double EL = E0L + dlL * gradEL;
     double ER = E0R + dlR * gradER;
 
-    //printf("before: %f, after: %f dl L/R = [%f %f]\n", F->verts[0]->Efield, 0.5 * (EL + ER), dlL, dlR);
+    //printf("exact: %f EL: %f ER: %f dl L/R = [%f %f]\n", F->verts[0]->Efield, EL, ER, dlL, dlR);
 
     F->verts[0]->Efield = 0.5 * (EL + ER);
   }

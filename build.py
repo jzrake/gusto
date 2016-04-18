@@ -29,6 +29,8 @@ user_struct = [
     ('sigma', 'double', 1.0),
     ('entropy', 'double', 1.0),
     ('curl_mode', 'char', '+'), # x, +, f
+    ('emf_param', 'double', 0.0), # [0,1], 0 for cells -> 1 for faces
+    ('emf_smooth', 'int', 0),
     ('validate_curl', 'int', 0),
     ('advance_poloidal_field', 'int', 1),
 ]
