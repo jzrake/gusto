@@ -836,24 +836,48 @@ void bc_none(struct gusto_sim *sim)
 
 
 
+static struct mesh_cell *get_cell_n_away(struct mesh_cell *C, int n)
+{
+  if (n == 0) {
+    return C;
+  }
+  else if (n > 0) {
+    return get_cell_n_away(C->next, n-1);
+  }
+  else if (n < 0) {
+    return get_cell_n_away(C->prev, n+1);
+  }
+  return NULL;
+}
+
+
+
 void bc_periodic_longitudinal(struct gusto_sim *sim)
 {
   /* Assumes we have exactly one guard zone in the longitudinal direction. Does
      nothing to the transverse direction. */
   for (int n=0; n<sim->num_rows; ++n) {
-    struct mesh_cell *Cinner_bc = sim->rows[n].cells;
-    struct mesh_cell *Couter_bc = sim->rows[n].cells;
 
-    while (Couter_bc->next) Couter_bc = Couter_bc->next;
+    struct mesh_cell *C0_end = sim->rows[n].cells;
+    struct mesh_cell *C1_end = C0_end; while (C1_end->next) C1_end = C1_end->next;
+    struct mesh_cell *C0_int = get_cell_n_away(C0_end, +sim->user.ng[0]);
+    struct mesh_cell *C1_int = get_cell_n_away(C1_end, -sim->user.ng[0]);
 
-    struct mesh_cell *Cinner_in = Cinner_bc->next;
-    struct mesh_cell *Couter_in = Couter_bc->prev;
 
-    Cinner_bc->aux[0] = Couter_in->aux[0];
-    Couter_bc->aux[0] = Cinner_in->aux[0];
+    for (int i=0; i<sim->user.ng[0]; ++i) {
 
-    gusto_to_conserved(&Cinner_bc->aux[0], Cinner_bc->U, Cinner_bc->dA);
-    gusto_to_conserved(&Couter_bc->aux[0], Couter_bc->U, Couter_bc->dA);
+      struct mesh_cell *Cinner_bc = get_cell_n_away(C0_end, +i);
+      struct mesh_cell *Couter_in = get_cell_n_away(C1_int, +i - sim->user.ng[0] + 1);
+
+      struct mesh_cell *Couter_bc = get_cell_n_away(C1_end, -i);
+      struct mesh_cell *Cinner_in = get_cell_n_away(C0_int, -i + sim->user.ng[0] - 1);
+
+      Cinner_bc->aux[0] = Couter_in->aux[0];
+      Couter_bc->aux[0] = Cinner_in->aux[0];
+
+      gusto_to_conserved(&Cinner_bc->aux[0], Cinner_bc->U, Cinner_bc->dA);
+      gusto_to_conserved(&Couter_bc->aux[0], Couter_bc->U, Couter_bc->dA);
+    }
   }
 }
 
