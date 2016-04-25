@@ -478,9 +478,9 @@ void gusto_recover_variables(struct gusto_sim *sim)
 	continue;
       }
       if (gusto_from_conserved(C->aux, C->U, C->dA)) {
-	printf("[gusto] at index [%d %d]\n",
-	       C->verts[0]->row_index,
-	       C->verts[0]->col_index / 2);
+	printf("[gusto] at index [%d %d] R=%f z=%f\n",
+	       C->verts[0]->col_index / 2,
+	       C->verts[0]->row_index, C->x[1], C->x[3]);
 	exit(1);
       }
     }
@@ -674,7 +674,7 @@ int gusto_from_conserved(struct aux_variables *A, double U[8], double dA[4])
 
   if (error != 0) {
     printf("[gusto] ERROR: %s\n", srmhd_c2p_get_error(c2p, error));
-    printf("[gusto] failed at on U = [%f %f %f %f %f %f %f %f]\n",
+    printf("[gusto] failed on U = [%f %f %f %f %f %f %f %f]\n",
 	   Uin[0], Uin[1], Uin[2], Uin[3],
 	   Uin[4], Uin[5], Uin[6], Uin[7]);
   }

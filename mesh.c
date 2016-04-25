@@ -129,8 +129,8 @@ void initial_mesh_cylindrical(struct gusto_user *user,
   int ngz = user->ng[1];
   int row_size = user->N[0] + 2 * ngR;
   int num_rows = user->N[1] + 2 * ngz;
-  int Nz = num_rows - 2 * ngz;
   int NR = row_size - 2 * ngR;
+  int Nz = num_rows - 2 * ngz;
   double R0 = user->domain[0];
   double R1 = user->domain[1];
   double z0 = user->domain[2];
@@ -158,12 +158,13 @@ void initial_mesh_spherical(struct gusto_user *user,
 			    struct mesh_query *Q)
 {
   /* Longitudinal direction is r, uses log binning in r */
-  int row_size = user->N[0];
-  int num_rows = user->N[1];
-  int ngt = user->ng[0];
-  int ngr = user->ng[1];
-  int Nt = num_rows - 2 * ngt;
+
+  int ngr = user->ng[0];
+  int ngt = user->ng[1];
+  int row_size = user->N[0] + 2 * ngr;
+  int num_rows = user->N[1] + 2 * ngt;
   int Nr = row_size - 2 * ngr;
+  int Nt = num_rows - 2 * ngt;
   double r0 = user->domain[0];
   double r1 = user->domain[1];
   double t0 = user->domain[2];

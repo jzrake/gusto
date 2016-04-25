@@ -13,6 +13,7 @@ user_struct = [
     ('ng', 'int[2]', [0, 0]),
     ('domain', 'double[4]', [0, 1, 0, 1]),
     ('coordinates', 'char', 'p'),
+    ('cfl', 'double', 0.5),
     ('rk_order', 'int', 2),
     ('move_cells', 'int', 0),
     ('mesh_stagger', 'double', 0.0),

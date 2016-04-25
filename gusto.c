@@ -164,7 +164,7 @@ int main(int argc, char **argv)
 
   while (sim.status.time_simulation < sim.user.tmax) {
 
-    double dt = 0.5 * sim.smallest_cell_length;
+    double dt = sim.user.cfl * sim.smallest_cell_length;
     sim.status.time_step = dt;
 
     /*
