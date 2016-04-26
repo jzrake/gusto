@@ -103,6 +103,7 @@ struct mesh_row
 {
   struct mesh_vert *verts;
   struct mesh_cell *cells;
+  struct mesh_cell *cells_end;
 } ;
 
 struct mesh_query

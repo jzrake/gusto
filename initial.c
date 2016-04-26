@@ -246,7 +246,7 @@ const char **id_michel73(struct gusto_user *user,
   double R = X[1];
   double z = X[3];
   double r = sqrt(R*R + z*z);
-  double omega = 1.0;
+  double omega = 0.5 * (X[0] < 1 ? X[0] : 1); /* ramps up */
 
   double Bz = z / pow(r, 3);
   double BR = R / pow(r, 3);
@@ -267,11 +267,11 @@ const char **id_michel73(struct gusto_user *user,
   double b0 = uR*BR + uf*Bf + uz*Bz;
   double Bp = sqrt(BR*BR + Bz*Bz);
   double up = sqrt(uR*uR + uz*uz);
-  double dg = user->density0 / user->sigma * Bp / up; if (dg > 1) dg = 1;
+  double dg = user->density0;// / user->sigma * Bp / up; if (dg > 1) dg = 1;
   double s0 = user->entropy; /* log(p / rho^Gamma) */
   double pg = exp(s0) * pow(dg, gamma_law_index);
 
-  /* printf("R=%f z=%f d=%f p=%f beta=%f\n", R, z, dg, pg, pg/(Bp*Bp)); */
+  /* printf("B^2/d=%f\n", Bp*Bp/dg); */
   /* double dg = user->density0; */
   /* double pg = user->pressure0; */
 
@@ -284,6 +284,7 @@ const char **id_michel73(struct gusto_user *user,
   A->comoving_mass_density = dg;
   A->gas_pressure = pg;
   A->vector_potential = Y / R;
+
 
   /*
    * [x] constant poloidal flux

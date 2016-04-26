@@ -975,13 +975,26 @@ void bc_periodic_all(struct gusto_sim *sim)
 void bc_inflow(struct gusto_sim *sim)
 {
   struct mesh_cell *C;
+
   for (int n=0; n<sim->num_rows; ++n) {
     DL_FOREACH(sim->rows[n].cells, C) {
       if (C->cell_type == 'g') {
-	gusto_default_aux(&C->aux[0]);
-	sim->initial_data(&sim->user, &C->aux[0], C->x);
-	gusto_complete_aux(&C->aux[0]);
-	gusto_to_conserved(&C->aux[0], C->U, C->dA);
+	if (C->verts[0]->col_index / 2 < sim->user.ng[0]) {
+	  gusto_default_aux(&C->aux[0]);
+	  C->x[0] = sim->status.time_simulation;
+	  sim->initial_data(&sim->user, &C->aux[0], C->x);
+	  gusto_complete_aux(&C->aux[0]);
+	  gusto_to_conserved(&C->aux[0], C->U, C->dA);
+	}
+	else {
+	  struct mesh_cell *Couter = sim->rows[n].cells_end;
+	  struct mesh_cell *Cinner = sim->rows[n].cells_end->prev;
+
+	  double tmpR = Couter->aux[0].R;
+	  Couter->aux[0] = Cinner->aux[0];
+	  Couter->aux[0].R = tmpR;
+	  gusto_to_conserved(&Couter->aux[0], Couter->U, Couter->dA);
+	}
       }
     }
   }

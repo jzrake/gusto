@@ -376,6 +376,7 @@ void gusto_mesh_generate_cells(struct gusto_sim *sim)
 
       DL_APPEND(sim->rows[n].cells, C);
     }
+    sim->rows[n].cells_end = C;
 
     int num_cells = gusto_mesh_count(sim, 'c', n);
     DL_FOREACH(sim->rows[n].cells, C) {
