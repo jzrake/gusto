@@ -265,8 +265,8 @@ const char **id_michel73(struct gusto_user *user,
   double uf = vm[2] * u0;
   double uz = vm[3] * u0;
   double b0 = uR*BR + uf*Bf + uz*Bz;
-  double Bp = sqrt(BR*BR + Bz*Bz);
-  double up = sqrt(uR*uR + uz*uz);
+  //double Bp = sqrt(BR*BR + Bz*Bz);
+  //double up = sqrt(uR*uR + uz*uz);
   double dg = user->density0;// / user->sigma * Bp / up; if (dg > 1) dg = 1;
   double s0 = user->entropy; /* log(p / rho^Gamma) */
   double pg = exp(s0) * pow(dg, gamma_law_index);

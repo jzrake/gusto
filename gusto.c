@@ -67,13 +67,9 @@ void gusto_advance_rk(struct gusto_sim *sim, double dt, double rkparam)
    */
   if (sim->user.move_cells) {
     gusto_compute_variables_at_vertices(sim);
-    gusto_compute_vertex_velocities(sim);
+    gusto_compute_face_velocities(sim);
   }
   gusto_compute_fluxes(sim);
-
-  if (sim->user.emf_smooth) {
-    gusto_smooth_electric_field(sim);
-  }
 
 
   /*
@@ -83,13 +79,7 @@ void gusto_advance_rk(struct gusto_sim *sim, double dt, double rkparam)
   gusto_transmit_fluxes(sim, dt);
   gusto_add_source_terms(sim, dt);
 
-  if (sim->user.advance_poloidal_field) {
-    gusto_advance_vector_potential(sim, dt);
-  }
-
   if (sim->user.move_cells) {
-    gusto_mesh_advance_vertices(sim, dt);
-    gusto_mesh_generate_faces(sim);
     gusto_mesh_compute_geometry(sim);
   }
 
@@ -105,9 +95,6 @@ void gusto_advance_rk(struct gusto_sim *sim, double dt, double rkparam)
    * potential, enforce boundary condtitions.
    * ---------------------------------------------------------------------------
    */
-  if (sim->user.advance_poloidal_field) {
-    gusto_compute_cell_magnetic_field(sim);
-  }
   gusto_recover_variables(sim);
   sim->boundary_con(sim);
 }
@@ -153,9 +140,7 @@ int main(int argc, char **argv)
     return 0;
   }
 
-  gusto_mesh_generate_verts(&sim);
-  gusto_mesh_generate_cells(&sim);
-  gusto_mesh_generate_faces(&sim);
+  gusto_mesh_generate(&sim);
   gusto_mesh_compute_geometry(&sim);
   gusto_mesh_report(&sim);
 
