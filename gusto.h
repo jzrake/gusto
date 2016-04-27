@@ -45,6 +45,16 @@ struct aux_variables
   double magnetic_pressure;
   double enthalpy_density; /* includes magnetic part: h + b^2 */
   double vector_potential; /* vector potential */
+  double R;                /* cylindrical radius */
+} ;
+
+
+struct aux_geometry
+{
+  double cylindrical_radius;
+  double volume_element;  /* sqrt(full metric determinant) */
+  double area_element[4]; /* sqrt(reduced metric determinant) */
+  double line_element[4]; /* scale factors */
 } ;
 
 
@@ -53,9 +63,9 @@ struct mesh_face
   double x[4];
   double x_rk[4];
   double Fhat[8]; /* Godunov fluxes */
-  double nhat[4]; /* 0: face area, 1,2,3: unit normal */
-  double length;  /* on the meridional plane */
+  double dA[4];
   struct aux_variables aux;
+  struct aux_geometry geom;
   struct mesh_cell *cells[2];
   struct mesh_face *next;
   struct mesh_face *prev;
@@ -64,12 +74,13 @@ struct mesh_face
 
 struct mesh_cell
 {
-  double x[4];
-  double U[8];
-  double U_rk[8];
-  double dA[4];
+  double x[4];    /* cell centroid */
+  double U[8];    /* conserved masses */
+  double U_rk[8]; /* cached values for RK stepping */
+  double dA[4];   /* conversion factors for conserved masses and densities */
   char cell_type;
   struct aux_variables aux;
+  struct aux_geometry geom;
   struct mesh_face *faces[2];
   struct mesh_cell *next;
   struct mesh_cell *prev;
@@ -117,6 +128,8 @@ int gusto_from_conserved(struct aux_variables *A, double U[8], double dA[4]);
 int gusto_wavespeeds(struct aux_variables *A, double n[4], double evals[8]);
 int gusto_fluxes(struct aux_variables *A, double n[4], double F[8]);
 
+
+void gusto_geometry(struct aux_geometry *G, double x[4]);
 
 
 /* Operations on the whole simulation */

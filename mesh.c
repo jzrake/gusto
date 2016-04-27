@@ -60,10 +60,14 @@ int gusto_mesh_count(struct gusto_sim *sim, char which, int n)
   else {
     switch (which) {
     case 'c':
-      DL_COUNT(sim->rows[n].cells, C, count);
+      if (n < sim->num_rows) {
+	DL_COUNT(sim->rows[n].cells, C, count);
+      }
       break;
     case 'f':
-      DL_COUNT(sim->rows[n].faces, F, count);
+      if (n < sim->num_rows) {
+	DL_COUNT(sim->rows[n].faces, F, count);
+      }
       break;
     }
   }
@@ -104,14 +108,85 @@ OpInitialMesh gusto_lookup_initial_mesh(const char *user_key)
 
 void gusto_mesh_generate(struct gusto_sim *sim)
 {
+  int row_size = sim->user.N[0];
+  struct mesh_face *F;
+  struct mesh_cell *C;
 
+  gusto_mesh_clear(sim, 'a');
+  sim->num_rows = sim->user.N[1];
+  sim->rows = (struct mesh_row *) malloc(sim->num_rows*sizeof(struct mesh_row));
+
+  for (int n=0; n<sim->num_rows; ++n) {
+
+    sim->rows[n].faces = NULL;
+    sim->rows[n].cells = NULL;
+
+    double x0 = 1.0;
+    double x1 = 2.0;
+    double dx = (x1 - x0) / row_size;
+
+    for (int i=0; i<row_size+1; ++i) {
+      F = (struct mesh_face *) malloc(sizeof(struct mesh_face));
+      F->x[1] = x0 + i * dx;
+      gusto_default_aux(&F->aux);
+      DL_APPEND(sim->rows[n].faces, F);
+    }
+
+    for (F=sim->rows[n].faces; F->next; F=F->next) {
+      C = (struct mesh_cell *) malloc(sizeof(struct mesh_cell));
+      C->faces[0] = F;
+      C->faces[1] = F->next;
+      gusto_default_aux(&C->aux);
+      DL_APPEND(sim->rows[n].cells, C);
+    }
+
+    for (C=sim->rows[n].cells; C->next; C=C->next) {
+      C->faces[0]->cells[1] = C;
+      C->faces[1]->cells[0] = C;
+    }
+  }
 }
 
 
 
 void gusto_mesh_compute_geometry(struct gusto_sim *sim)
 {
+  struct mesh_face *F;
+  struct mesh_cell *C;
 
+  for (int n=0; n<sim->num_rows; ++n) {
+
+    for (F=sim->rows[n].faces; F->next; F=F->next) {
+      gusto_geometry(&F->geom, F->x);
+
+      double dA = F->geom.area_element[3];
+      double dy = F->geom.line_element[1];
+
+      F->dA[0] = dA;
+      F->dA[1] = 1.0;
+      F->dA[2] = dy;
+      F->dA[3] = 1.0;
+    }
+
+    for (C=sim->rows[n].cells; C->next; C=C->next) {
+
+      /* Set the cell centroid to the average of the face's coordinate. */
+      C->x[1] = 0.5 * (C->faces[0]->x[1] + C->faces[1]->x[1]);
+
+      /* Compute the scale factors for that position. */
+      gusto_geometry(&C->geom, C->x);
+
+      double dx = C->faces[1]->x[1] - C->faces[0]->x[1];
+      double dy = C->geom.line_element[1];
+      double dV = C->geom.volume_element;
+
+      C->aux.R = C->geom.cylindrical_radius;
+      C->dA[0] = dx * dV;
+      C->dA[1] = 1.0;
+      C->dA[2] = dx * dy;
+      C->dA[3] = 1.0;
+    }
+  }
 }
 
 

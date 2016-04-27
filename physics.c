@@ -74,15 +74,14 @@ void gusto_transmit_fluxes(struct gusto_sim *sim, double dt)
     struct mesh_cell *CR = F->cells[1];
 
     for (int q=0; q<5; ++q) {
-      if (CL) CL->U[q] -= F->Fhat[q] * F->nhat[0] * dt;
-      if (CR) CR->U[q] += F->Fhat[q] * F->nhat[0] * dt;
+      if (CL) CL->U[q] -= F->Fhat[q] * F->dA[0] * dt;
+      if (CR) CR->U[q] += F->Fhat[q] * F->dA[0] * dt;
     }
 
-    if (CL) CL->U[B22] -= F->Fhat[B22] * F->length * dt;
-    if (CR) CR->U[B22] += F->Fhat[B22] * F->length * dt;
+    if (CL) CL->U[B22] -= F->Fhat[B22] * F->dA[2] * dt;
+    if (CR) CR->U[B22] += F->Fhat[B22] * F->dA[2] * dt;
   }
 }
-
 
 
 
@@ -92,7 +91,9 @@ void gusto_add_source_terms(struct gusto_sim *sim, double dt)
   double Udot[5] = {0,0,0,0,0};
   for (int n=0; n<sim->num_rows; ++n) {
     DL_FOREACH(sim->rows[n].cells, C) {
+
       gusto_geometric_source_terms(&C->aux, Udot);
+
       for (int q=0; q<5; ++q) {
 	C->U[q] += Udot[q] * C->dA[0] * dt;
       }
@@ -110,6 +111,16 @@ void gusto_recover_variables(struct gusto_sim *sim)
       if (C->cell_type == 'g') { /* don't bother if it's a guard */
 	continue;
       }
+
+      double dx = C->faces[1]->x[1] - C->faces[0]->x[1];
+      double dV = C->geom.volume_element * dx;
+
+      double dA[4];
+      dA[0] = dx * dV;
+      dA[1] = 1.0;
+      dA[2] = C->geom.line_element[2];
+      dA[3] = 1.0;
+
       if (gusto_from_conserved(&C->aux, C->U, C->dA)) {
 	exit(1);
       }
@@ -144,6 +155,7 @@ void gusto_default_aux(struct aux_variables *A)
   A->magnetic_four_vector[1] = 0.0;
   A->magnetic_four_vector[2] = 0.0;
   A->magnetic_four_vector[3] = 0.0;
+  gusto_complete_aux(A);
 }
 
 
@@ -210,7 +222,7 @@ void gusto_to_conserved(struct aux_variables *A, double U[8], double dA[4])
   U[B33] =          b3 * u0 - u3 * b0;
   /* Note that B1 and B3 are point-wise and B2 is a flux */
 
-  //U[S22] *= A->R; /* R != 1 if in cylindrical coordinates */
+  U[S22] *= A->R; /* R != 1 if in cylindrical coordinates */
 }
 
 
@@ -226,11 +238,11 @@ int gusto_from_conserved(struct aux_variables *A, double U[8], double dA[4])
   Uin[S11] = U[S11] / dA[0];
   Uin[S22] = U[S22] / dA[0];
   Uin[S33] = U[S33] / dA[0];
-  Uin[B11] = U[B11];
-  Uin[B22] = U[B22] / dA[2]; /* toroidal field (along phi) */
-  Uin[B33] = U[B33];
+  Uin[B11] = U[B11] / dA[1];
+  Uin[B22] = U[B22] / dA[2];
+  Uin[B33] = U[B33] / dA[3];
 
-  //Uin[S22] /= A->R;
+  Uin[S22] /= A->R;
 
   srmhd_c2p_set_pressure_floor(c2p, -1.0);
   srmhd_c2p_set_gamma(c2p, gamma_law_index);
@@ -378,7 +390,7 @@ int gusto_fluxes(struct aux_variables *A, double n[4], double F[8])
   F[B22] = B2 * vn - Bn * v2;
   F[B33] = B3 * vn - Bn * v3;
 
-  //F[S22] *= A->R; /* R != 1 if in cylindrical coordinates */
+  F[S22] *= A->R; /* R != 1 if in cylindrical coordinates */
 
   return 0;
 }

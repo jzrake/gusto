@@ -12,6 +12,9 @@ void gusto_init(struct gusto_sim *sim)
   sim->rows = NULL;
   gusto_user_set_defaults(&sim->user);
   gusto_status_set_defaults(&sim->status);
+  sim->boundary_con = NULL;
+  sim->initial_mesh = NULL;
+  sim->initial_data = NULL;
 }
 
 
@@ -24,8 +27,8 @@ void gusto_free(struct gusto_sim *sim)
 void gusto_config_from_user(struct gusto_sim *sim)
 {
   sim->boundary_con = gusto_lookup_boundary_con(sim->user.boundary_con);
-  sim->initial_mesh = gusto_lookup_initial_mesh(sim->user.initial_mesh);
   sim->initial_data = gusto_lookup_initial_data(sim->user.initial_data);
+  /* sim->initial_mesh = gusto_lookup_initial_mesh(sim->user.initial_mesh); */
 }
 
 
@@ -34,7 +37,7 @@ int gusto_is_valid(struct gusto_sim *sim)
   int valid = 1;
   valid &= sim->boundary_con != NULL;
   valid &= sim->initial_data != NULL;
-  valid &= sim->initial_mesh != NULL;
+  /* valid &= sim->initial_mesh != NULL; */
   return valid;
 }
 
