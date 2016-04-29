@@ -11,14 +11,82 @@
 
 void gusto_initial_data(struct gusto_sim *sim)
 {
+  struct mesh_cell *C;
+  struct aux_variables *A;
 
+  for (int n=0; n<sim->num_rows; ++n) {
+
+    DL_FOREACH(sim->rows[n].cells, C) {
+      A = &C->aux;
+      gusto_default_aux(A);
+      sim->initial_data(&sim->user, A, C->x);
+      gusto_complete_aux(A);
+      gusto_to_conserved(A, C->U, C->dA);
+    }
+
+  }
+}
+
+
+
+void gusto_validate_fluxes(struct gusto_sim *sim)
+{
+  struct mesh_cell *C;
+
+  for (int n=0; n<sim->num_rows; ++n) {
+
+    DL_FOREACH(sim->rows[n].cells, C) {
+
+      if (C->faces[0] && C->faces[1]) {
+	double F[8];
+	double nhat[4] = {0, 0, 0, 1};
+	double dA = C->geom.area_element[3];
+
+	gusto_fluxes(&C->aux, nhat, F);
+
+	printf("F.dA = %f %f %f %f %f %f (dA=%f)\n",
+	       F[0] * dA,
+	       F[1] * dA,
+	       F[2] * dA,
+	       F[3] * dA,
+	       F[4] * dA, F[B22] * C->geom.line_element[2], dA);
+      }
+    }
+  }
 }
 
 
 
 void gusto_compute_fluxes(struct gusto_sim *sim)
 {
+  struct mesh_face *F;
 
+  for (int n=0; n<sim->num_rows; ++n) {
+    DL_FOREACH(sim->rows[n].faces, F) {
+
+      struct mesh_cell *CL = F->cells[0];
+      struct mesh_cell *CR = F->cells[1];
+      struct aux_variables AL, AR;
+      double vpar = 0.0;
+
+      if (CL && CR) {
+	AL = CL->aux;
+	AR = CR->aux;
+      }
+      else if (CL) {
+	AL = CL->aux;
+	AR = CL->aux;
+      }
+      else if (CR) {
+	AL = CR->aux;
+	AR = CR->aux;
+      }
+
+      double nhat[4] = {0, 0, 0, 1};
+      gusto_riemann(&AL, &AR, nhat, F->Fhat, vpar);
+
+    }
+  }
 }
 
 
@@ -88,11 +156,12 @@ void gusto_transmit_fluxes(struct gusto_sim *sim, double dt)
 void gusto_add_source_terms(struct gusto_sim *sim, double dt)
 {
   struct mesh_cell *C;
-  double Udot[5] = {0,0,0,0,0};
+
   for (int n=0; n<sim->num_rows; ++n) {
     DL_FOREACH(sim->rows[n].cells, C) {
 
-      gusto_geometric_source_terms(&C->aux, Udot);
+      double Udot[5] = {0,0,0,0,0};
+      gusto_geometry_source_terms(&C->aux, &C->geom, Udot);
 
       for (int q=0; q<5; ++q) {
 	C->U[q] += Udot[q] * C->dA[0] * dt;
@@ -111,35 +180,11 @@ void gusto_recover_variables(struct gusto_sim *sim)
       if (C->cell_type == 'g') { /* don't bother if it's a guard */
 	continue;
       }
-
-      double dx = C->faces[1]->x[1] - C->faces[0]->x[1];
-      double dV = C->geom.volume_element * dx;
-
-      double dA[4];
-      dA[0] = dx * dV;
-      dA[1] = 1.0;
-      dA[2] = C->geom.line_element[2];
-      dA[3] = 1.0;
-
       if (gusto_from_conserved(&C->aux, C->U, C->dA)) {
 	exit(1);
       }
     }
   }
-}
-
-
-
-void gusto_compute_face_velocities(struct gusto_sim *sim)
-{
-
-}
-
-
-
-void gusto_compute_variables_at_vertices(struct gusto_sim *sim)
-{
-
 }
 
 
@@ -217,10 +262,12 @@ void gusto_to_conserved(struct aux_variables *A, double U[8], double dA[4])
   U[S11] = dA[0] * (H0 * u0 * u1 - b0 * b1);
   U[S22] = dA[0] * (H0 * u0 * u2 - b0 * b2);
   U[S33] = dA[0] * (H0 * u0 * u3 - b0 * b3);
-  U[B11] =          b1 * u0 - u1 * b0;
+  U[B11] = dA[1] * (b1 * u0 - u1 * b0);
   U[B22] = dA[2] * (b2 * u0 - u2 * b0);
-  U[B33] =          b3 * u0 - u3 * b0;
+  U[B33] = dA[3] * (b3 * u0 - u3 * b0);
   /* Note that B1 and B3 are point-wise and B2 is a flux */
+
+  /* printf("conserved: S=[%f %f %f] B=[%f %f %f]\n", U[S11], U[S22], U[S33], U[B11], U[B22], U[B33]); */
 
   U[S22] *= A->R; /* R != 1 if in cylindrical coordinates */
 }
@@ -393,21 +440,6 @@ int gusto_fluxes(struct aux_variables *A, double n[4], double F[8])
   F[S22] *= A->R; /* R != 1 if in cylindrical coordinates */
 
   return 0;
-}
-
-
-
-void gusto_geometric_source_terms(struct aux_variables *A, double Udot[8])
-{
-  /* double *u = A->velocity_four_vector; */
-  /* double *b = A->magnetic_four_vector; */
-  /* double pg = A->gas_pressure; */
-  /* double pb = A->magnetic_pressure; */
-  /* double H0 = A->enthalpy_density; */
-
-  /* This is intended to be used for 1D meshes, and is valid only on the
-     equatorial plane. */
-  /* Udot[S11] = (2*(pg + pb) + u[2]*u[2]*H0 - b[2]*b[2]) / A->R; */
 }
 
 

@@ -64,16 +64,11 @@ void gusto_print_help(struct gusto_sim *sim)
 void gusto_advance_rk(struct gusto_sim *sim, double dt, double rkparam)
 {
   /*
-   * Evaluate derived data associated with the input state: vertex velocities,
-   * Godunov fluxes, electric fields.
+   * Evaluate derived data associated with the input state, namely Godunov
+   * fluxes.
    * ---------------------------------------------------------------------------
    */
-  if (sim->user.move_cells) {
-    gusto_compute_variables_at_vertices(sim);
-    gusto_compute_face_velocities(sim);
-  }
   gusto_compute_fluxes(sim);
-
 
   /*
    * Update conserved quantities, vector potential, and vertex locations.
@@ -81,10 +76,6 @@ void gusto_advance_rk(struct gusto_sim *sim, double dt, double rkparam)
    */
   gusto_transmit_fluxes(sim, dt);
   gusto_add_source_terms(sim, dt);
-
-  if (sim->user.move_cells) {
-    gusto_mesh_compute_geometry(sim);
-  }
 
   /*
    * Correct conserved quantities, vector potential, and vertex locations for
@@ -148,6 +139,7 @@ int main(int argc, char **argv)
   gusto_mesh_report(&sim);
 
   gusto_initial_data(&sim);
+  gusto_validate_fluxes(&sim);
 
 
   while (sim.status.time_simulation < sim.user.tmax) {

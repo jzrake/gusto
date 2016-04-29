@@ -5,7 +5,6 @@
 #include "utlist.h"
 #include "gusto.h"
 
-#define STERADIAN (2 * M_PI)
 
 
 void gusto_mesh_report(struct gusto_sim *sim)
@@ -108,12 +107,12 @@ OpInitialMesh gusto_lookup_initial_mesh(const char *user_key)
 
 void gusto_mesh_generate(struct gusto_sim *sim)
 {
-  int row_size = sim->user.N[0];
+  int row_size = sim->user.N;
   struct mesh_face *F;
   struct mesh_cell *C;
 
   gusto_mesh_clear(sim, 'a');
-  sim->num_rows = sim->user.N[1];
+  sim->num_rows = 1;
   sim->rows = (struct mesh_row *) malloc(sim->num_rows*sizeof(struct mesh_row));
 
   for (int n=0; n<sim->num_rows; ++n) {
@@ -140,7 +139,7 @@ void gusto_mesh_generate(struct gusto_sim *sim)
       DL_APPEND(sim->rows[n].cells, C);
     }
 
-    for (C=sim->rows[n].cells; C->next; C=C->next) {
+    for (C=sim->rows[n].cells; C; C=C->next) {
       C->faces[0]->cells[1] = C;
       C->faces[1]->cells[0] = C;
     }
@@ -154,37 +153,38 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
   struct mesh_face *F;
   struct mesh_cell *C;
 
+  sim->smallest_cell_length = 1.0;
+
   for (int n=0; n<sim->num_rows; ++n) {
 
-    for (F=sim->rows[n].faces; F->next; F=F->next) {
+    for (F=sim->rows[n].faces; F; F=F->next) {
       gusto_geometry(&F->geom, F->x);
 
-      double dA = F->geom.area_element[3];
-      double dy = F->geom.line_element[1];
-
-      F->dA[0] = dA;
-      F->dA[1] = 1.0;
-      F->dA[2] = dy;
-      F->dA[3] = 1.0;
+      F->dA[0] = F->geom.area_element[3];
+      F->dA[1] = F->geom.line_element[1];
+      F->dA[2] = F->geom.line_element[2];
+      F->dA[3] = F->geom.line_element[3];
     }
 
-    for (C=sim->rows[n].cells; C->next; C=C->next) {
+    for (C=sim->rows[n].cells; C; C=C->next) {
 
       /* Set the cell centroid to the average of the face's coordinate. */
       C->x[1] = 0.5 * (C->faces[0]->x[1] + C->faces[1]->x[1]);
 
       /* Compute the scale factors for that position. */
       gusto_geometry(&C->geom, C->x);
+      C->aux.R = C->geom.cylindrical_radius;
 
       double dx = C->faces[1]->x[1] - C->faces[0]->x[1];
-      double dy = C->geom.line_element[1];
-      double dV = C->geom.volume_element;
 
-      C->aux.R = C->geom.cylindrical_radius;
-      C->dA[0] = dx * dV;
+      /* These are the cell's volume element (dA[0]), and area elements along
+	 each axis. Only the */
+      C->dA[0] = C->geom.volume_element  * dx;
       C->dA[1] = 1.0;
-      C->dA[2] = dx * dy;
-      C->dA[3] = 1.0;
+      C->dA[2] = C->geom.area_element[2] * dx;
+      C->dA[3] = C->geom.area_element[3];
+
+      if (dx < sim->smallest_cell_length) sim->smallest_cell_length = dx;
     }
   }
 }

@@ -100,9 +100,29 @@ struct mesh_row
  * Function prototypes
  * =====================================================================
  */
-/* General utilities */
-void *gusto_start_clock();
-double gusto_stop_clock(void *clock_s);
+
+/* Application level things */
+void gusto_init(struct gusto_sim *sim);
+void gusto_free(struct gusto_sim *sim);
+void gusto_config_from_user(struct gusto_sim *sim);
+void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname);
+int gusto_is_valid(struct gusto_sim *sim);
+OpBoundaryCon gusto_lookup_boundary_con(const char *user_key);
+OpInitialMesh gusto_lookup_initial_mesh(const char *user_key);
+OpInitialData gusto_lookup_initial_data(const char *user_key);
+
+
+/* Operations on the whole simulation */
+void gusto_recover_variables(struct gusto_sim *sim);
+void gusto_initial_data(struct gusto_sim *sim);
+void gusto_validate_fluxes(struct gusto_sim *sim);
+void gusto_compute_fluxes(struct gusto_sim *sim);
+void gusto_compute_face_magnetic_flux(struct gusto_sim *sim);
+void gusto_compute_cell_field_from_faces(struct gusto_sim *sim);
+void gusto_compute_cell_magnetic_field(struct gusto_sim *sim);
+void gusto_transmit_fluxes(struct gusto_sim *sim, double dt);
+void gusto_smooth_electric_field(struct gusto_sim *sim);
+void gusto_add_source_terms(struct gusto_sim *sim, double dt);
 
 
 /* Mesh operations */
@@ -111,7 +131,6 @@ void gusto_mesh_report(struct gusto_sim *sim);
 void gusto_mesh_clear(struct gusto_sim *sim, char which);
 void gusto_mesh_generate(struct gusto_sim *sim);
 void gusto_mesh_compute_geometry(struct gusto_sim *sim);
-void gusto_mesh_advance_vertices(struct gusto_sim *sim, double dt);
 void gusto_cache_rk(struct gusto_sim *sim);
 void gusto_average_rk(struct gusto_sim *sim, double b);
 
@@ -122,7 +141,6 @@ void gusto_riemann(struct aux_variables *AL, struct aux_variables *AR,
 void gusto_to_conserved(struct aux_variables *A, double U[8], double dA[4]);
 void gusto_default_aux(struct aux_variables *A);
 void gusto_complete_aux(struct aux_variables *A);
-void gusto_geometric_source_terms(struct aux_variables *A, double Udot[8]);
 void gusto_electric_field(struct aux_variables *A, double E[4]);
 int gusto_from_conserved(struct aux_variables *A, double U[8], double dA[4]);
 int gusto_wavespeeds(struct aux_variables *A, double n[4], double evals[8]);
@@ -130,34 +148,14 @@ int gusto_fluxes(struct aux_variables *A, double n[4], double F[8]);
 
 
 void gusto_geometry(struct aux_geometry *G, double x[4]);
+void gusto_geometry_source_terms(struct aux_variables *A,
+				 struct aux_geometry *G, double Udot[8]);
 
 
-/* Operations on the whole simulation */
-void gusto_recover_variables(struct gusto_sim *sim);
-void gusto_initial_data(struct gusto_sim *sim);
-void gusto_compute_face_velocities(struct gusto_sim *sim);
-void gusto_compute_variables_at_vertices(struct gusto_sim *sim);
-void gusto_compute_fluxes(struct gusto_sim *sim);
-void gusto_compute_face_magnetic_flux(struct gusto_sim *sim);
-void gusto_compute_cell_field_from_faces(struct gusto_sim *sim);
-void gusto_compute_cell_magnetic_field(struct gusto_sim *sim);
-void gusto_transmit_fluxes(struct gusto_sim *sim, double dt);
-void gusto_smooth_electric_field(struct gusto_sim *sim);
-void gusto_advance_vector_potential(struct gusto_sim *sim, double dt);
-void gusto_add_source_terms(struct gusto_sim *sim, double dt);
+/* General utilities */
+void *gusto_start_clock();
+double gusto_stop_clock(void *clock_s);
 
-
-void gusto_init(struct gusto_sim *sim);
-void gusto_free(struct gusto_sim *sim);
-void gusto_config_from_user(struct gusto_sim *sim);
-void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname);
-int gusto_is_valid(struct gusto_sim *sim);
-
-
-
-OpBoundaryCon gusto_lookup_boundary_con(const char *user_key);
-OpInitialMesh gusto_lookup_initial_mesh(const char *user_key);
-OpInitialData gusto_lookup_initial_data(const char *user_key);
 
 
 /*

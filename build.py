@@ -9,9 +9,9 @@ user_struct = [
     ('outdir', 'char[256]', '.'),
     ('tmax', 'double', 1.0),
     ('cpi', 'double', 1.0),
-    ('N', 'int[2]', [128, 1]),
-    ('ng', 'int[2]', [0, 0]),
-    ('domain', 'double[4]', [0, 1, 0, 1]),
+    ('N', 'int', 128),
+    ('ng', 'int', 0),
+    ('domain', 'double[2]', [1, 10]),
     ('coordinates', 'char', 'p'),
     ('cfl', 'double', 0.5),
     ('rk_order', 'int', 2),
@@ -26,14 +26,8 @@ user_struct = [
     ('density1', 'double', 1.0),
     ('fourvel0', 'double', 0.0),
     ('fourvel1', 'double', 0.0),
-    ('abc', 'double[3]', [1.0, 0.0, 1.0]),
     ('sigma', 'double', 1.0),
-    ('entropy', 'double', 1.0),
-    ('curl_mode', 'char', '+'), # x, +, f
-    ('emf_param', 'double', 0.0), # [0,1], 0 for cells -> 1 for faces
-    ('emf_smooth', 'int', 0),
-    ('validate_curl', 'int', 0),
-    ('advance_poloidal_field', 'int', 1),
+    ('entropy', 'double', 1.0)
 ]
 
 

@@ -26,151 +26,6 @@ static const char **id_uniform(struct gusto_user *user,
 
 
 
-const char **id_cylindrical_shock(struct gusto_user *user,
-				  struct aux_variables *A, double *X)
-{
-  if (A == NULL) {
-    static const char *help[] = { "-- Cylindrical shock wave --",
-				  NULL };
-    return help;
-  }
-
-  double x = X[1] - 0.5;
-  double y = X[3] - 0.5;
-  if (sqrt(x*x + y*y) < 0.125) {
-    A->comoving_mass_density = 1.0;
-    A->gas_pressure = 1.0;
-  }
-  else {
-    A->comoving_mass_density = 0.1;
-    A->gas_pressure = 0.125;
-  }
-
-  return NULL;
-}
-
-
-
-const char **id_sound_wave(struct gusto_user *user,
-			   struct aux_variables *A, double *X)
-{
-  if (A == NULL) {
-    static const char *help[] = { "-- Sound wave --",
-				  NULL };
-    return help;
-  }
-  double k = 2 * M_PI;
-  double z = X[3];
-
-  double gm = gamma_law_index;
-  double d0 = 1.0;
-  double p0 = 1.0;
-  double u0 = 0.0;
-  double h0 = 1.0 + (p0/d0) * gm / (gm - 1);
-  double cs = sqrt(gm * p0 / d0 / h0);
-  double dd = 0.1;
-  double dp = cs * cs * dd;
-  double du = cs * dd / d0;
-
-  double d = d0 + dd * sin(k * z);
-  double p = p0 + dp * sin(k * z);
-  double u = u0 + du * sin(k * z);
-
-  A->velocity_four_vector[3] = u;
-  A->comoving_mass_density = d;
-  A->gas_pressure = p;
-
-  return NULL;
-}
-
-
-
-const char **id_density_wave(struct gusto_user *user,
-			     struct aux_variables *A, double *X)
-{
-  if (A == NULL) {
-    static const char *help[] = { "-- Density wave --",
-				  "pressure0: ambient gas pressure",
-				  "density0: ambient density",
-				  "density1: density perturbation",
-				  "fourvel0: four velocity in the R direction",
-				  "fourvel1: four velocity in the z direction",
-				  NULL };
-    return help;
-  }
-  double k = 2 * M_PI;
-  double R = X[1];
-  double z = X[3];
-  double d = user->density0 + user->density1 * sin(k * z + k * R);
-
-  A->velocity_four_vector[1] = user->fourvel0;
-  A->velocity_four_vector[3] = user->fourvel1;
-  A->comoving_mass_density = d;
-  A->gas_pressure = user->pressure0;
-
-  return NULL;
-}
-
-
-
-const char **id_abc_ff(struct gusto_user *user,
-		       struct aux_variables *A, double *X)
-{
-  if (A == NULL) {
-    static const char *help[] =
-      { "-- ABC magnetic field --",
-	"fourvel0: four velocity in the R direction",
-	"fourvel1: four velocity in the z direction",
-	NULL };
-    return help;
-  }
-
-  double a = user->abc[0];
-  double b = user->abc[1];
-  double c = user->abc[2];
-
-  double al = 2 * M_PI;
-  double B1 = c * cos(X[3] * al) - b * sin(X[2] * al);
-  double B2 = a * cos(X[1] * al) - c * sin(X[3] * al);
-  double B3 = b * cos(X[2] * al) - a * sin(X[1] * al);
-
-  A->magnetic_four_vector[1] = B1;
-  A->magnetic_four_vector[2] = B2;
-  A->magnetic_four_vector[3] = B3;
-
-  A->vector_potential = B2 / al;
-  A->velocity_four_vector[1] = user->fourvel0;
-  A->velocity_four_vector[3] = user->fourvel1;
-
-  return NULL;
-}
-
-
-
-const char **id_cyl_ff(struct gusto_user *user,
-		       struct aux_variables *A, double *X)
-{
-  if (A == NULL) {
-    static const char *help[] =
-      { "-- Cylindrical force-free magnetic field --",
-	NULL };
-    return help;
-  }
-
-  double R = X[1];
-  double B1 = 0.0;
-  double B2 = j1(R);
-  double B3 = j0(R);
-
-  A->magnetic_four_vector[1] = B1;
-  A->magnetic_four_vector[2] = B2;
-  A->magnetic_four_vector[3] = B3;
-
-  return NULL;
-}
-
-
-
 const char **id_michel69(struct gusto_user *user,
 			 struct aux_variables *A, double *X)
 {
@@ -221,10 +76,10 @@ const char **id_michel69(struct gusto_user *user,
   double s = user->entropy; /* log(p / rho^Gamma) */
   double p = exp(s) * pow(d, gamma_law_index);
 
-  A->velocity_four_vector[1] = ur;
   A->velocity_four_vector[2] = uf;
-  A->magnetic_four_vector[1] = br / sqrt(4 * M_PI); /* code units of B field */
-  A->magnetic_four_vector[2] = bf / sqrt(4 * M_PI);
+  A->velocity_four_vector[3] = ur;
+  A->magnetic_four_vector[2] = bf / sqrt(4 * M_PI); /* code units of B field */
+  A->magnetic_four_vector[3] = br / sqrt(4 * M_PI);
   A->comoving_mass_density = d;
   A->gas_pressure = p;
 
@@ -285,22 +140,6 @@ const char **id_michel73(struct gusto_user *user,
   A->gas_pressure = pg;
   A->vector_potential = Y / R;
 
-
-  /*
-   * [x] constant poloidal flux
-   * [x] constant mass flux
-   * [x] constant energy flux --- need to use v_min
-   * [x] constant L flux
-   */
-
-  /* double nhat[4] = {0, B[1]/Bp, 0, B[3]/Bp}; */
-  /* double SFlux = VEC4_DOT(S, nhat); */
-  /* double dA = 1.0 / Bp; */
-  /* double F[8]; */
-  /* gusto_complete_aux(A); */
-  /* gusto_fluxes(A, nhat, F); */
-  /* printf("S.dA=%f F[TAU].dA=%f\n", SFlux * dA, (F[TAU] + F[DDD]) * dA); */
-
   return NULL;
 }
 
@@ -357,21 +196,6 @@ const char **id_narayan07(struct gusto_user *user,
   A->gas_pressure = pg;
   A->vector_potential = Y / R;
 
-  /*
-   * [x] constant poloidal flux
-   * [x] constant mass flux
-   * [x] constant energy flux --- need to use v_min
-   * [x] constant L flux
-   */
-
-  /* double nhat[4] = {0, B[1]/Bp, 0, B[3]/Bp}; */
-  /* double SFlux = VEC4_DOT(S, nhat); */
-  /* double dA = 1.0 / Bp; */
-  /* double F[8]; */
-  /* gusto_complete_aux(A); */
-  /* gusto_fluxes(A, nhat, F); */
-  /* printf("S.dA=%f F[TAU].dA=%f\n", SFlux * dA, (F[TAU] + F[DDD]) * dA); */
-
   return NULL;
 }
 
@@ -381,10 +205,6 @@ OpInitialData gusto_lookup_initial_data(const char *user_key)
 {
   const char *keys[] = {
     "uniform",
-    "cylindrical_shock",
-    "density_wave",
-    "abc_ff",
-    "cyl_ff",
     "michel69",
     "michel73",
     "narayan07",
@@ -392,10 +212,6 @@ OpInitialData gusto_lookup_initial_data(const char *user_key)
   } ;
   OpInitialData vals[] = {
     id_uniform,
-    id_cylindrical_shock,
-    id_density_wave,
-    id_abc_ff,
-    id_cyl_ff,
     id_michel69,
     id_michel73,
     id_narayan07,

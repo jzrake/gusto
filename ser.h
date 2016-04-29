@@ -5,9 +5,9 @@ struct gusto_user {
     char outdir[256];
     double tmax;
     double cpi;
-    int N[2];
-    int ng[2];
-    double domain[4];
+    int N;
+    int ng;
+    double domain[2];
     char coordinates;
     double cfl;
     int rk_order;
@@ -22,14 +22,8 @@ struct gusto_user {
     double density1;
     double fourvel0;
     double fourvel1;
-    double abc[3];
     double sigma;
     double entropy;
-    char curl_mode;
-    double emf_param;
-    int emf_smooth;
-    int validate_curl;
-    int advance_poloidal_field;
 };
 
 
