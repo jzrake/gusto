@@ -1,9 +1,10 @@
 #include "gusto.h"
 
 
+
 void gusto_geometry(struct aux_geometry *G, double x[4])
 {
-  double r = x[1];
+  double r = x[3];
   double B = 1.0 / (r * r);
   double h[4] = { -1, 1 / (B * r), r, 1 };
   G->cylindrical_radius = r;
@@ -21,13 +22,12 @@ void gusto_geometry(struct aux_geometry *G, double x[4])
 void gusto_geometry_source_terms(struct aux_variables *A,
 				 struct aux_geometry *G, double Udot[8])
 {
-  /* double *u = A->velocity_four_vector; */
-  /* double *b = A->magnetic_four_vector; */
-  /* double pg = A->gas_pressure; */
-  /* double pb = A->magnetic_pressure; */
-  /* double H0 = A->enthalpy_density; */
+  double *u = A->velocity_four_vector;
+  double *b = A->magnetic_four_vector;
+  double H0 = A->enthalpy_density;
+  double p0 = A->gas_pressure + A->magnetic_pressure;
 
-  /* This is intended to be used for 1D meshes, and is valid only on the
-     equatorial plane. */
-  /* Udot[S11] = (2*(pg + pb) + u[2]*u[2]*H0 - b[2]*b[2]) / A->R; */
+  Udot[S33] = (2*p0 + u[2]*u[2]*H0 - b[2]*b[2]) / A->R;
+
+  /* Udot[S33] = -p0 * dBdx / B + (u[2]*u[2]*H0 - b[2]*b[2]) * dRdx / R; */
 }

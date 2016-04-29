@@ -8,7 +8,6 @@ void gusto_init(struct gusto_sim *sim)
 {
   sim->num_rows = 0;
   sim->smallest_cell_length = 0.0;
-  sim->faces = NULL;
   sim->rows = NULL;
   gusto_user_set_defaults(&sim->user);
   gusto_status_set_defaults(&sim->status);
@@ -139,7 +138,7 @@ int main(int argc, char **argv)
   gusto_mesh_report(&sim);
 
   gusto_initial_data(&sim);
-  gusto_validate_fluxes(&sim);
+  /* gusto_validate_fluxes(&sim); */
 
 
   while (sim.status.time_simulation < sim.user.tmax) {

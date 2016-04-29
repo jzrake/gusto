@@ -25,7 +25,6 @@ struct gusto_sim
 {
   int num_rows;
   double smallest_cell_length; /* for CFL condition */
-  struct mesh_face *faces;
   struct mesh_row *rows;
   struct gusto_user user;
   struct gusto_status status;
@@ -91,7 +90,6 @@ struct mesh_row
 {
   struct mesh_face *faces;
   struct mesh_cell *cells;
-  struct mesh_cell *cells_end;
 } ;
 
 

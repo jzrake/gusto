@@ -120,13 +120,15 @@ void gusto_mesh_generate(struct gusto_sim *sim)
     sim->rows[n].faces = NULL;
     sim->rows[n].cells = NULL;
 
-    double x0 = 1.0;
-    double x1 = 2.0;
+    double x0 = sim->user.domain[0];
+    double x1 = sim->user.domain[1];
     double dx = (x1 - x0) / row_size;
 
     for (int i=0; i<row_size+1; ++i) {
       F = (struct mesh_face *) malloc(sizeof(struct mesh_face));
-      F->x[1] = x0 + i * dx;
+      F->x[3] = x0 + i * dx;
+      F->cells[0] = NULL;
+      F->cells[1] = NULL;
       gusto_default_aux(&F->aux);
       DL_APPEND(sim->rows[n].faces, F);
     }
@@ -142,7 +144,13 @@ void gusto_mesh_generate(struct gusto_sim *sim)
     for (C=sim->rows[n].cells; C; C=C->next) {
       C->faces[0]->cells[1] = C;
       C->faces[1]->cells[0] = C;
+
+      if      (C->prev->next == NULL) C->cell_type = 'g';
+      else if (C->next       == NULL) C->cell_type = 'g';
+      else                            C->cell_type = 'i';
+
     }
+
   }
 }
 
@@ -169,13 +177,13 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
     for (C=sim->rows[n].cells; C; C=C->next) {
 
       /* Set the cell centroid to the average of the face's coordinate. */
-      C->x[1] = 0.5 * (C->faces[0]->x[1] + C->faces[1]->x[1]);
+      C->x[3] = 0.5 * (C->faces[0]->x[3] + C->faces[1]->x[3]);
 
       /* Compute the scale factors for that position. */
       gusto_geometry(&C->geom, C->x);
       C->aux.R = C->geom.cylindrical_radius;
 
-      double dx = C->faces[1]->x[1] - C->faces[0]->x[1];
+      double dx = C->faces[1]->x[3] - C->faces[0]->x[3];
 
       /* These are the cell's volume element (dA[0]), and area elements along
 	 each axis. Only the */
@@ -186,6 +194,7 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
 
       if (dx < sim->smallest_cell_length) sim->smallest_cell_length = dx;
     }
+
   }
 }
 

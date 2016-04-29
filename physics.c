@@ -37,20 +37,19 @@ void gusto_validate_fluxes(struct gusto_sim *sim)
 
     DL_FOREACH(sim->rows[n].cells, C) {
 
-      if (C->faces[0] && C->faces[1]) {
-	double F[8];
-	double nhat[4] = {0, 0, 0, 1};
-	double dA = C->geom.area_element[3];
+      double F[8];
+      double nhat[4] = {0, 0, 0, 1};
+      double dA = C->geom.area_element[3];
 
-	gusto_fluxes(&C->aux, nhat, F);
+      gusto_fluxes(&C->aux, nhat, F);
 
-	printf("F.dA = %f %f %f %f %f %f (dA=%f)\n",
-	       F[0] * dA,
-	       F[1] * dA,
-	       F[2] * dA,
-	       F[3] * dA,
-	       F[4] * dA, F[B22] * C->geom.line_element[2], dA);
-      }
+      printf("F.dA = %f %f %f %f %f %f (dA=%f)\n",
+	     F[0] * dA,
+	     F[1] * dA,
+	     F[2] * dA,
+	     F[3] * dA,
+	     F[4] * dA, F[B22] * C->geom.line_element[2], dA);
+
     }
   }
 }
@@ -137,17 +136,19 @@ void gusto_transmit_fluxes(struct gusto_sim *sim, double dt)
 {
   struct mesh_face *F;
 
-  DL_FOREACH(sim->faces, F) {
-    struct mesh_cell *CL = F->cells[0];
-    struct mesh_cell *CR = F->cells[1];
+  for (int n=0; n<sim->num_rows; ++n) {
+    DL_FOREACH(sim->rows[n].faces, F) {
+      struct mesh_cell *CL = F->cells[0];
+      struct mesh_cell *CR = F->cells[1];
 
-    for (int q=0; q<5; ++q) {
-      if (CL) CL->U[q] -= F->Fhat[q] * F->dA[0] * dt;
-      if (CR) CR->U[q] += F->Fhat[q] * F->dA[0] * dt;
+      for (int q=0; q<5; ++q) {
+	if (CL) CL->U[q] -= F->Fhat[q] * F->dA[0] * dt;
+	if (CR) CR->U[q] += F->Fhat[q] * F->dA[0] * dt;
+      }
+
+      if (CL) CL->U[B22] -= F->Fhat[B22] * F->dA[2] * dt;
+      if (CR) CR->U[B22] += F->Fhat[B22] * F->dA[2] * dt;
     }
-
-    if (CL) CL->U[B22] -= F->Fhat[B22] * F->dA[2] * dt;
-    if (CR) CR->U[B22] += F->Fhat[B22] * F->dA[2] * dt;
   }
 }
 
@@ -177,10 +178,11 @@ void gusto_recover_variables(struct gusto_sim *sim)
   struct mesh_cell *C;
   for (int n=0; n<sim->num_rows; ++n) {
     DL_FOREACH(sim->rows[n].cells, C) {
-      if (C->cell_type == 'g') { /* don't bother if it's a guard */
+      if (C->cell_type == 'g') {
 	continue;
       }
       if (gusto_from_conserved(&C->aux, C->U, C->dA)) {
+	printf("[gusto] at position (%f -> %f)\n", C->faces[0]->x[3], C->faces[1]->x[3]);
 	exit(1);
       }
     }
@@ -515,14 +517,66 @@ void bc_none(struct gusto_sim *sim)
 
 
 
+void bc_inflow(struct gusto_sim *sim)
+{
+
+  for (int n=0; n<sim->num_rows; ++n) {
+
+    struct mesh_cell *C0 = sim->rows[n].cells;
+    struct mesh_cell *C1 = sim->rows[n].cells->prev;
+
+    gusto_default_aux(&C0->aux);
+    sim->initial_data(&sim->user, &C0->aux, C0->x);
+    gusto_complete_aux(&C0->aux);
+    gusto_to_conserved(&C0->aux, C0->U, C0->dA);
+
+    gusto_default_aux(&C1->aux);
+    sim->initial_data(&sim->user, &C1->aux, C1->x);
+    gusto_complete_aux(&C1->aux);
+    gusto_to_conserved(&C1->aux, C1->U, C1->dA);
+
+  }
+}
+
+
+
+void bc_inflow_outflow(struct gusto_sim *sim)
+{
+
+  for (int n=0; n<sim->num_rows; ++n) {
+
+    struct mesh_cell *C0 = sim->rows[n].cells;
+    struct mesh_cell *C1 = sim->rows[n].cells->prev;
+
+    gusto_default_aux(&C0->aux);
+    sim->initial_data(&sim->user, &C0->aux, C0->x);
+    gusto_complete_aux(&C0->aux);
+    gusto_to_conserved(&C0->aux, C0->U, C0->dA);
+
+    double tmpR = C1->aux.R;
+    gusto_default_aux(&C1->aux);
+    C1->aux = C1->prev->aux;
+    C1->aux.R = tmpR;
+    gusto_complete_aux(&C1->aux);
+    gusto_to_conserved(&C1->aux, C1->U, C1->dA);
+
+  }
+}
+
+
+
 OpBoundaryCon gusto_lookup_boundary_con(const char *user_key)
 {
   const char *keys[] = {
     "none",
+    "inflow",
+    "inflow_outflow",
     NULL
   } ;
   OpBoundaryCon vals[] = {
     bc_none,
+    bc_inflow,
+    bc_inflow_outflow,
     NULL } ;
   int n = 0;
   const char *key;
