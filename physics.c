@@ -267,9 +267,6 @@ void gusto_to_conserved(struct aux_variables *A, double U[8], double dA[4])
   U[B11] = dA[1] * (b1 * u0 - u1 * b0);
   U[B22] = dA[2] * (b2 * u0 - u2 * b0);
   U[B33] = dA[3] * (b3 * u0 - u3 * b0);
-  /* Note that B1 and B3 are point-wise and B2 is a flux */
-
-  /* printf("conserved: S=[%f %f %f] B=[%f %f %f]\n", U[S11], U[S22], U[S33], U[B11], U[B22], U[B33]); */
 
   U[S22] *= A->R; /* R != 1 if in cylindrical coordinates */
 }

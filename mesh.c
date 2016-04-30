@@ -122,11 +122,12 @@ void gusto_mesh_generate(struct gusto_sim *sim)
 
     double x0 = sim->user.domain[0];
     double x1 = sim->user.domain[1];
-    double dx = (x1 - x0) / row_size;
+    double dx = log(x1 / x0) / row_size;
+    //double dx = (x1 - x0) / row_size;
 
     for (int i=0; i<row_size+1; ++i) {
       F = (struct mesh_face *) malloc(sizeof(struct mesh_face));
-      F->x[3] = x0 + i * dx;
+      F->x[3] = x0 * exp(i * dx); //x0 + i * dx;
       F->cells[0] = NULL;
       F->cells[1] = NULL;
       gusto_default_aux(&F->aux);
