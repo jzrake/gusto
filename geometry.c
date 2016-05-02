@@ -3,8 +3,8 @@
 #include "gusto.h"
 
 
-#define PARABOLOIDAL 1
-#define MONOPOLE 0
+#define PARABOLOIDAL 0
+#define MONOPOLE 1
 
 static double poloidal_field(double R, double z, double *BR, double *Bz);
 static double flux_function(double R, double z);

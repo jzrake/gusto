@@ -209,7 +209,6 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
 
       /* Compute the scale factors for that position. */
       gusto_geometry(&C->geom, C->y);
-      C->aux.R = C->geom.cylindrical_radius;
 
       C->geom.dXB = (C->faces[1]->geom.poloidal_field -
 		     C->faces[0]->geom.poloidal_field) / dX;

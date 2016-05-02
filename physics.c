@@ -21,7 +21,7 @@ void gusto_initial_data(struct gusto_sim *sim)
       gusto_default_aux(A);
       sim->initial_data(&sim->user, A, C->x);
       gusto_complete_aux(A);
-      gusto_to_conserved(A, C->U, C->dA);
+      gusto_to_conserved(A, &C->geom, C->U, C->dA);
     }
 
   }
@@ -41,7 +41,7 @@ int gusto_validate_fluxes(struct gusto_sim *sim)
       double nhat[4] = {0, 0, 0, 1};
       double dA = C->geom.area_element[3];
 
-      gusto_fluxes(&C->aux, nhat, F);
+      gusto_fluxes(&C->aux, &C->geom, nhat, F);
 
       printf("F.dA = %f %f %f %f %f %f (dA=%f)\n",
 	     F[0] * dA,
@@ -68,23 +68,24 @@ void gusto_compute_fluxes(struct gusto_sim *sim)
       struct mesh_cell *CL = F->cells[0];
       struct mesh_cell *CR = F->cells[1];
       struct aux_variables AL, AR;
+      struct aux_geometry GL, GR;
       double vpar = 0.0;
 
       if (CL && CR) {
-	AL = CL->aux;
-	AR = CR->aux;
+	AL = CL->aux; GL = CL->geom;
+	AR = CR->aux; GR = CR->geom;
       }
       else if (CL) {
-	AL = CL->aux;
-	AR = CL->aux;
+	AL = CL->aux; GL = CL->geom;
+	AR = CL->aux; GR = CL->geom;
       }
       else if (CR) {
-	AL = CR->aux;
-	AR = CR->aux;
+	AL = CR->aux; GL = CR->geom;
+	AR = CR->aux; GR = CR->geom;
       }
 
       double nhat[4] = {0, 0, 0, 1};
-      gusto_riemann(&AL, &AR, nhat, F->Fhat, vpar);
+      gusto_riemann(&AL, &AR, &GL, &GR, &F->geom, nhat, F->Fhat, vpar);
 
     }
   }
@@ -183,7 +184,7 @@ void gusto_recover_variables(struct gusto_sim *sim)
       if (C->cell_type == 'g') {
 	continue;
       }
-      if (gusto_from_conserved(&C->aux, C->U, C->dA)) {
+      if (gusto_from_conserved(&C->aux, &C->geom, C->U, C->dA)) {
 	printf("[gusto] at position (%f -> %f)\n", C->faces[0]->x[3], C->faces[1]->x[3]);
 	exit(1);
       }
@@ -244,7 +245,8 @@ void gusto_complete_aux(struct aux_variables *A)
 
 
 
-void gusto_to_conserved(struct aux_variables *A, double U[8], double dA[4])
+void gusto_to_conserved(struct aux_variables *A,
+			struct aux_geometry *G, double U[8], double dA[4])
 {
   double *b = A->magnetic_four_vector;
   double *u = A->velocity_four_vector;
@@ -270,12 +272,14 @@ void gusto_to_conserved(struct aux_variables *A, double U[8], double dA[4])
   U[B22] = dA[2] * (b2 * u0 - u2 * b0);
   U[B33] = dA[3] * (b3 * u0 - u3 * b0);
 
-  U[S22] *= A->R; /* R != 1 if in cylindrical coordinates */
+  U[S22] *= G->cylindrical_radius;
 }
 
 
 
-int gusto_from_conserved(struct aux_variables *A, double U[8], double dA[4])
+int gusto_from_conserved(struct aux_variables *A,
+			 struct aux_geometry *G,
+			 double U[8], double dA[4])
 {
   double Uin[8]; /* conserved densities */
   double Pin[8]; /* primitive variables d, p, v, B */
@@ -290,7 +294,7 @@ int gusto_from_conserved(struct aux_variables *A, double U[8], double dA[4])
   Uin[B22] = U[B22] / dA[2];
   Uin[B33] = U[B33] / dA[3];
 
-  Uin[S22] /= A->R;
+  Uin[S22] /= G->cylindrical_radius;
 
   srmhd_c2p_set_pressure_floor(c2p, -1.0);
   srmhd_c2p_set_gamma(c2p, gamma_law_index);
@@ -398,7 +402,9 @@ int gusto_wavespeeds(struct aux_variables *A, double n[4], double evals[8])
 
 
 
-int gusto_fluxes(struct aux_variables *A, double n[4], double F[8])
+int gusto_fluxes(struct aux_variables *A,
+		 struct aux_geometry *G,
+		 double n[4], double F[8])
 {
   const double u0 = A->velocity_four_vector[0];
   const double u1 = A->velocity_four_vector[1];
@@ -438,7 +444,7 @@ int gusto_fluxes(struct aux_variables *A, double n[4], double F[8])
   F[B22] = B2 * vn - Bn * v2;
   F[B33] = B3 * vn - Bn * v3;
 
-  F[S22] *= A->R; /* R != 1 if in cylindrical coordinates */
+  F[S22] *= G->cylindrical_radius;
 
   return 0;
 }
@@ -464,6 +470,9 @@ void gusto_electric_field(struct aux_variables *A, double E[4])
 
 void gusto_riemann(struct aux_variables *AL,
 		   struct aux_variables *AR,
+		   struct aux_geometry *GL,
+		   struct aux_geometry *GR,
+		   struct aux_geometry *GF,
 		   double nhat[4],
 		   double Fhat[8], double s)
 {
@@ -477,10 +486,10 @@ void gusto_riemann(struct aux_variables *AL,
 
   gusto_wavespeeds(AL, nhat, lamL);
   gusto_wavespeeds(AR, nhat, lamR);
-  gusto_to_conserved(AL, UL, dA_unit);
-  gusto_to_conserved(AR, UR, dA_unit);
-  gusto_fluxes(AL, nhat, FL);
-  gusto_fluxes(AR, nhat, FR);
+  gusto_to_conserved(AL, GL, UL, dA_unit);
+  gusto_to_conserved(AR, GR, UR, dA_unit);
+  gusto_fluxes(AL, GF, nhat, FL);
+  gusto_fluxes(AR, GF, nhat, FR);
 
   double Sm = gusto_min3(lamL[0], lamR[0], 0.0);
   double Sp = gusto_max3(lamL[7], lamR[7], 0.0);
@@ -527,12 +536,12 @@ void bc_inflow(struct gusto_sim *sim)
     gusto_default_aux(&C0->aux);
     sim->initial_data(&sim->user, &C0->aux, C0->x);
     gusto_complete_aux(&C0->aux);
-    gusto_to_conserved(&C0->aux, C0->U, C0->dA);
+    gusto_to_conserved(&C0->aux, &C0->geom, C0->U, C0->dA);
 
     gusto_default_aux(&C1->aux);
     sim->initial_data(&sim->user, &C1->aux, C1->x);
     gusto_complete_aux(&C1->aux);
-    gusto_to_conserved(&C1->aux, C1->U, C1->dA);
+    gusto_to_conserved(&C1->aux, &C1->geom, C1->U, C1->dA);
 
   }
 }
@@ -550,14 +559,12 @@ void bc_inflow_outflow(struct gusto_sim *sim)
     gusto_default_aux(&C0->aux);
     sim->initial_data(&sim->user, &C0->aux, C0->x);
     gusto_complete_aux(&C0->aux);
-    gusto_to_conserved(&C0->aux, C0->U, C0->dA);
+    gusto_to_conserved(&C0->aux, &C0->geom, C0->U, C0->dA);
 
-    double tmpR = C1->aux.R;
     gusto_default_aux(&C1->aux);
     C1->aux = C1->prev->aux;
-    C1->aux.R = tmpR;
     gusto_complete_aux(&C1->aux);
-    gusto_to_conserved(&C1->aux, C1->U, C1->dA);
+    gusto_to_conserved(&C1->aux, &C0->geom, C1->U, C1->dA);
 
   }
 }

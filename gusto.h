@@ -44,7 +44,6 @@ struct aux_variables
   double magnetic_pressure;
   double enthalpy_density; /* includes magnetic part: h + b^2 */
   double vector_potential; /* vector potential */
-  double R;                /* cylindrical radius */
 } ;
 
 
@@ -57,7 +56,6 @@ struct aux_geometry
   double line_element[4]; /* scale factors */
   double dYB, dXB;        /* derivatives of B and R with respect to psi, chi */
   double dYR, dXR;
-
 } ;
 
 
@@ -142,15 +140,22 @@ void gusto_average_rk(struct gusto_sim *sim, double b);
 
 
 /* Operations on one or more variable states */
-void gusto_riemann(struct aux_variables *AL, struct aux_variables *AR,
+void gusto_riemann(struct aux_variables *AL,
+		   struct aux_variables *AR,
+		   struct aux_geometry *GL,
+		   struct aux_geometry *GR,
+		   struct aux_geometry *GF,
 		   double nhat[4], double Fhat[8], double s);
-void gusto_to_conserved(struct aux_variables *A, double U[8], double dA[4]);
 void gusto_default_aux(struct aux_variables *A);
 void gusto_complete_aux(struct aux_variables *A);
 void gusto_electric_field(struct aux_variables *A, double E[4]);
-int gusto_from_conserved(struct aux_variables *A, double U[8], double dA[4]);
+void gusto_to_conserved(struct aux_variables *A, struct
+			aux_geometry *G, double U[8], double dA[4]);
+int gusto_from_conserved(struct aux_variables *A,
+			 struct aux_geometry *G, double U[8], double dA[4]);
 int gusto_wavespeeds(struct aux_variables *A, double n[4], double evals[8]);
-int gusto_fluxes(struct aux_variables *A, double n[4], double F[8]);
+int gusto_fluxes(struct aux_variables *A, struct aux_geometry *G,
+		 double n[4], double F[8]);
 
 
 void gusto_geometry(struct aux_geometry *G, double x[4]);
