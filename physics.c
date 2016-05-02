@@ -29,7 +29,7 @@ void gusto_initial_data(struct gusto_sim *sim)
 
 
 
-void gusto_validate_fluxes(struct gusto_sim *sim)
+int gusto_validate_fluxes(struct gusto_sim *sim)
 {
   struct mesh_cell *C;
 
@@ -52,6 +52,8 @@ void gusto_validate_fluxes(struct gusto_sim *sim)
 
     }
   }
+
+  return 0;
 }
 
 

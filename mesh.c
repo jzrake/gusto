@@ -120,18 +120,39 @@ void gusto_mesh_generate(struct gusto_sim *sim)
     sim->rows[n].faces = NULL;
     sim->rows[n].cells = NULL;
 
-    double x0 = sim->user.domain[0];
-    double x1 = sim->user.domain[1];
-    double dx = log(x1 / x0) / row_size;
-    //double dx = (x1 - x0) / row_size;
+    double X0 = sim->user.domain[0];
+    double X1 = sim->user.domain[1];
+    double dlogX = log(X1 / X0) / row_size;
+
+    double X = X0;
+    double R = 1.0;
+    double z = 1e-4;
+    double dX, dR, dz, dB, Bp;
 
     for (int i=0; i<row_size+1; ++i) {
+
+      dX = X * dlogX; /* change in distance along the field line */
+      Bp = gusto_geometry_step_along_field(sim, R, z, &dR, &dz, &dB, dX);
+
       F = (struct mesh_face *) malloc(sizeof(struct mesh_face));
-      F->x[3] = x0 * exp(i * dx); //x0 + i * dx;
+      F->y[1] = R;
+      F->y[3] = z;
+      F->x[1] = 1.0;
+      F->x[3] = X;
+
+      //F->x[3] = x0 * exp(i * dlogx);
+
+      F->geom.dXB = dB / dX;
+      F->geom.dXR = dR / dX;
+
       F->cells[0] = NULL;
       F->cells[1] = NULL;
       gusto_default_aux(&F->aux);
       DL_APPEND(sim->rows[n].faces, F);
+
+      X += dX;
+      R += dR;
+      z += dz;
     }
 
     for (F=sim->rows[n].faces; F->next; F=F->next) {
@@ -143,6 +164,7 @@ void gusto_mesh_generate(struct gusto_sim *sim)
     }
 
     for (C=sim->rows[n].cells; C; C=C->next) {
+
       C->faces[0]->cells[1] = C;
       C->faces[1]->cells[0] = C;
 
@@ -167,7 +189,7 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
   for (int n=0; n<sim->num_rows; ++n) {
 
     for (F=sim->rows[n].faces; F; F=F->next) {
-      gusto_geometry(&F->geom, F->x);
+      gusto_geometry(&F->geom, F->y);
 
       F->dA[0] = F->geom.area_element[3];
       F->dA[1] = F->geom.line_element[1];
@@ -177,23 +199,31 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
 
     for (C=sim->rows[n].cells; C; C=C->next) {
 
+      double dX = C->faces[1]->x[3] - C->faces[0]->x[3];
+
       /* Set the cell centroid to the average of the face's coordinate. */
+      C->y[1] = 0.5 * (C->faces[0]->y[1] + C->faces[1]->y[1]);
+      C->y[3] = 0.5 * (C->faces[0]->y[3] + C->faces[1]->y[3]);
+      C->x[1] = 0.5 * (C->faces[0]->x[1] + C->faces[1]->x[1]);
       C->x[3] = 0.5 * (C->faces[0]->x[3] + C->faces[1]->x[3]);
 
       /* Compute the scale factors for that position. */
-      gusto_geometry(&C->geom, C->x);
+      gusto_geometry(&C->geom, C->y);
       C->aux.R = C->geom.cylindrical_radius;
 
-      double dx = C->faces[1]->x[3] - C->faces[0]->x[3];
+      C->geom.dXB = (C->faces[1]->geom.poloidal_field -
+		     C->faces[0]->geom.poloidal_field) / dX;
+      C->geom.dXR = (C->faces[1]->geom.cylindrical_radius -
+		     C->faces[0]->geom.cylindrical_radius) / dX;
 
       /* These are the cell's volume element (dA[0]), and area elements along
 	 each axis. Only the */
-      C->dA[0] = C->geom.volume_element  * dx;
+      C->dA[0] = C->geom.volume_element  * dX;
       C->dA[1] = 1.0;
-      C->dA[2] = C->geom.area_element[2] * dx;
+      C->dA[2] = C->geom.area_element[2] * dX;
       C->dA[3] = C->geom.area_element[3];
 
-      if (dx < sim->smallest_cell_length) sim->smallest_cell_length = dx;
+      if (dX < sim->smallest_cell_length) sim->smallest_cell_length = dX;
     }
 
   }

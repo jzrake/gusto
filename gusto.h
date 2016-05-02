@@ -51,15 +51,20 @@ struct aux_variables
 struct aux_geometry
 {
   double cylindrical_radius;
+  double poloidal_field;
   double volume_element;  /* sqrt(full metric determinant) */
   double area_element[4]; /* sqrt(reduced metric determinant) */
   double line_element[4]; /* scale factors */
+  double dYB, dXB;        /* derivatives of B and R with respect to psi, chi */
+  double dYR, dXR;
+
 } ;
 
 
 struct mesh_face
 {
-  double x[4];
+  double x[4];    /* face centroid in flux coordinates */
+  double y[4];    /* face centroid in cylindrical coordinates */
   double x_rk[4];
   double Fhat[8]; /* Godunov fluxes */
   double dA[4];
@@ -73,7 +78,8 @@ struct mesh_face
 
 struct mesh_cell
 {
-  double x[4];    /* cell centroid */
+  double x[4];    /* cell centroid in flux coordinates */
+  double y[4];    /* cell centroid in cylindrical coordinates */
   double U[8];    /* conserved masses */
   double U_rk[8]; /* cached values for RK stepping */
   double dA[4];   /* conversion factors for conserved masses and densities */
@@ -111,9 +117,11 @@ OpInitialData gusto_lookup_initial_data(const char *user_key);
 
 
 /* Operations on the whole simulation */
+int gusto_validate_sim(struct gusto_sim *sim);
+int gusto_validate_fluxes(struct gusto_sim *sim);
+int gusto_validate_geometry(struct gusto_sim *sim);
 void gusto_recover_variables(struct gusto_sim *sim);
 void gusto_initial_data(struct gusto_sim *sim);
-void gusto_validate_fluxes(struct gusto_sim *sim);
 void gusto_compute_fluxes(struct gusto_sim *sim);
 void gusto_compute_face_magnetic_flux(struct gusto_sim *sim);
 void gusto_compute_cell_field_from_faces(struct gusto_sim *sim);
@@ -148,7 +156,10 @@ int gusto_fluxes(struct aux_variables *A, double n[4], double F[8]);
 void gusto_geometry(struct aux_geometry *G, double x[4]);
 void gusto_geometry_source_terms(struct aux_variables *A,
 				 struct aux_geometry *G, double Udot[8]);
-
+double gusto_geometry_step_along_field(struct gusto_sim *sim,
+				       double R, double z,
+				       double *dR, double *dz, double *dB,
+				       double dchi);
 
 /* General utilities */
 void *gusto_start_clock();

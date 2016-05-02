@@ -31,7 +31,7 @@ void gusto_config_from_user(struct gusto_sim *sim)
 }
 
 
-int gusto_is_valid(struct gusto_sim *sim)
+int gusto_validate_sim(struct gusto_sim *sim)
 {
   int valid = 1;
   valid &= sim->boundary_con != NULL;
@@ -128,7 +128,7 @@ int main(int argc, char **argv)
   gusto_config_from_user(&sim);
   gusto_print_help(&sim);
 
-  if (!gusto_is_valid(&sim)) {
+  if (!gusto_validate_sim(&sim)) {
     printf("[gusto] ERROR: invalid setup\n");
     return 0;
   }
@@ -139,6 +139,7 @@ int main(int argc, char **argv)
 
   gusto_initial_data(&sim);
   /* gusto_validate_fluxes(&sim); */
+  gusto_validate_geometry(&sim);
 
 
   while (sim.status.time_simulation < sim.user.tmax) {
