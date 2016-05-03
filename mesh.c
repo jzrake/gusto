@@ -120,12 +120,12 @@ void gusto_mesh_generate(struct gusto_sim *sim)
     sim->rows[n].faces = NULL;
     sim->rows[n].cells = NULL;
 
-    double X0 = sim->user.domain[0];
-    double X1 = sim->user.domain[1];
-    double dlogX = log(X1 / X0) / row_size;
+    double R0 = sim->user.domain[0];
+    double R1 = sim->user.domain[1];
+    double dlogX = log(R1 / R0) / row_size;
 
-    double X = X0;
-    double R = 1.0;
+    double X = 1.0;
+    double R = R0;
     double z = 1e-4;
     double dX, dR, dz, dB, Bp;
 
@@ -139,8 +139,6 @@ void gusto_mesh_generate(struct gusto_sim *sim)
       F->y[3] = z;
       F->x[1] = 1.0;
       F->x[3] = X;
-
-      //F->x[3] = x0 * exp(i * dlogx);
 
       F->geom.dXB = dB / dX;
       F->geom.dXR = dR / dX;
@@ -216,7 +214,7 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
 		     C->faces[0]->geom.cylindrical_radius) / dX;
 
       /* These are the cell's volume element (dA[0]), and area elements along
-	 each axis. Only the */
+	 each axis. */
       C->dA[0] = C->geom.volume_element  * dX;
       C->dA[1] = 1.0;
       C->dA[2] = C->geom.area_element[2] * dX;

@@ -76,46 +76,9 @@ void gusto_geometry_source_terms(struct aux_variables *A,
   double H0 = A->enthalpy_density;
   double p0 = A->gas_pressure + A->magnetic_pressure;
 
-  /* Udot[S33] = (2*p0 + u[2]*u[2]*H0 - b[2]*b[2]) / A->R; */
+  /* Udot[S33] = (2*p0 + u[2]*u[2]*H0 - b[2]*b[2]) / R; */
 
   Udot[S33] = -p0 * G->dXB / B + (u[2]*u[2]*H0 - b[2]*b[2]) * G->dXR / R;
-}
-
-
-
-double flux_function(double R, double z)
-{
-  if (PARABOLOIDAL) {
-    return sqrt(R*R + z*z) - z;
-  }
-  if (MONOPOLE) {
-    return 1 - z / sqrt(R*R + z*z);
-  }
-}
-
-
-
-double poloidal_field(double R, double z, double *BR, double *Bz)
-{
-  double dR = R * 1e-6;
-  double dz = z * 1e-6;
-
-  double YRm2 = flux_function(R-2*dR, z);
-  double YRm1 = flux_function(R-1*dR, z);
-  double YRp1 = flux_function(R+1*dR, z);
-  double YRp2 = flux_function(R+2*dR, z);
-  double Yzm2 = flux_function(R, z-2*dz);
-  double Yzm1 = flux_function(R, z-1*dz);
-  double Yzp1 = flux_function(R, z+1*dz);
-  double Yzp2 = flux_function(R, z+2*dz);
-
-  double dRY = (-YRp2 + 8 * YRp1 - 8 * YRm1 + YRm2) / (12 * dR);
-  double dzY = (-Yzp2 + 8 * Yzp1 - 8 * Yzm1 + Yzm2) / (12 * dz);
-
-  *BR = -dzY / R;
-  *Bz = +dRY / R;
-
-  return sqrt((*BR) * (*BR) + (*Bz) * (*Bz));
 }
 
 
@@ -160,4 +123,41 @@ double gusto_geometry_step_along_field(struct gusto_sim *sim,
   *dB = Bp1 - Bp0;
 
   return Bp0;
+}
+
+
+
+double flux_function(double R, double z)
+{
+  if (PARABOLOIDAL) {
+    return sqrt(R*R + z*z) - z;
+  }
+  if (MONOPOLE) {
+    return 1 - z / sqrt(R*R + z*z);
+  }
+}
+
+
+
+double poloidal_field(double R, double z, double *BR, double *Bz)
+{
+  double dR = R * 1e-6;
+  double dz = z * 1e-6;
+
+  double YRm2 = flux_function(R-2*dR, z);
+  double YRm1 = flux_function(R-1*dR, z);
+  double YRp1 = flux_function(R+1*dR, z);
+  double YRp2 = flux_function(R+2*dR, z);
+  double Yzm2 = flux_function(R, z-2*dz);
+  double Yzm1 = flux_function(R, z-1*dz);
+  double Yzp1 = flux_function(R, z+1*dz);
+  double Yzp2 = flux_function(R, z+2*dz);
+
+  double dRY = (-YRp2 + 8 * YRp1 - 8 * YRm1 + YRm2) / (12 * dR);
+  double dzY = (-Yzp2 + 8 * Yzp1 - 8 * Yzm1 + Yzm2) / (12 * dz);
+
+  *BR = -dzY / R;
+  *Bz = +dRY / R;
+
+  return sqrt((*BR) * (*BR) + (*Bz) * (*Bz));
 }
