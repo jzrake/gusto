@@ -40,7 +40,7 @@ const char **id_michel69(struct gusto_user *user,
     return help;
   }
 
-  double r = X[3];
+  double r = X[1];
   double c = 1.0;
   double Phi = 1.0;
   double sig = user->sigma;

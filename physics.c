@@ -19,7 +19,7 @@ void gusto_initial_data(struct gusto_sim *sim)
     DL_FOREACH(sim->rows[n].cells, C) {
       A = &C->aux;
       gusto_default_aux(A);
-      sim->initial_data(&sim->user, A, C->x);
+      sim->initial_data(&sim->user, A, C->y);
       gusto_complete_aux(A);
       gusto_to_conserved(A, &C->geom, C->U, C->dA);
     }
@@ -185,7 +185,8 @@ void gusto_recover_variables(struct gusto_sim *sim)
 	continue;
       }
       if (gusto_from_conserved(&C->aux, &C->geom, C->U, C->dA)) {
-	printf("[gusto] at position (%f -> %f)\n", C->faces[0]->x[3], C->faces[1]->x[3]);
+	printf("[gusto] at position (%f -> %f)\n",
+	       C->faces[0]->x[3], C->faces[1]->x[3]);
 	exit(1);
       }
     }
@@ -534,12 +535,12 @@ void bc_inflow(struct gusto_sim *sim)
     struct mesh_cell *C1 = sim->rows[n].cells->prev;
 
     gusto_default_aux(&C0->aux);
-    sim->initial_data(&sim->user, &C0->aux, C0->x);
+    sim->initial_data(&sim->user, &C0->aux, C0->y);
     gusto_complete_aux(&C0->aux);
     gusto_to_conserved(&C0->aux, &C0->geom, C0->U, C0->dA);
 
     gusto_default_aux(&C1->aux);
-    sim->initial_data(&sim->user, &C1->aux, C1->x);
+    sim->initial_data(&sim->user, &C1->aux, C1->y);
     gusto_complete_aux(&C1->aux);
     gusto_to_conserved(&C1->aux, &C1->geom, C1->U, C1->dA);
 
@@ -557,7 +558,7 @@ void bc_inflow_outflow(struct gusto_sim *sim)
     struct mesh_cell *C1 = sim->rows[n].cells->prev;
 
     gusto_default_aux(&C0->aux);
-    sim->initial_data(&sim->user, &C0->aux, C0->x);
+    sim->initial_data(&sim->user, &C0->aux, C0->y);
     gusto_complete_aux(&C0->aux);
     gusto_to_conserved(&C0->aux, &C0->geom, C0->U, C0->dA);
 
