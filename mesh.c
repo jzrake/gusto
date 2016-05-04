@@ -126,7 +126,7 @@ void gusto_mesh_generate(struct gusto_sim *sim)
 
     double X = 1.0;
     double R = R0;
-    double z = 1e-4;
+    double z = 1.0;//1e-4; /* !!!!! */
     double dX, dR, dz, dB, Bp;
 
     for (int i=0; i<row_size+1; ++i) {

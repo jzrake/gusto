@@ -69,6 +69,7 @@ class DatasetBrowser(QtGui.QWidget):
         remove_button.clicked.connect(self.handle_remove_button)
 
         model = QtGui.QStandardItemModel()
+        model.itemChanged.connect(self.handle_item_changed)
 
         list_view = QtGui.QListView()
         list_view.setModel(model)
@@ -219,7 +220,6 @@ class PlottingArea(QtGui.QWidget):
 
     def reset_plot(self):
         from matplotlib.lines import Line2D
-
         self.axes.cla()
         self.line = Line2D([], [])
         self.axes.add_line(self.line)
@@ -239,9 +239,10 @@ class PlottingArea(QtGui.QWidget):
         self.line.set_data(x, y)
         self.axes.relim(visible_only=True)
         self.axes.autoscale_view()
-        self.canvas.draw()
         self.axes.set_title(self.dset_filename)
+        self.axes.set_xlabel('R')
         self.axes.set_ylabel(self.variable)
+        self.canvas.draw()
 
         dset.close()
 

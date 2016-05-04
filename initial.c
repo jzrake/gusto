@@ -40,7 +40,9 @@ const char **id_michel69(struct gusto_user *user,
     return help;
   }
 
-  double r = X[1];
+  double R = X[1];
+  double z = X[3];
+  double r = sqrt(R*R + z*z);
   double c = 1.0;
   double Phi = 1.0;
   double sig = user->sigma;
@@ -101,44 +103,33 @@ const char **id_michel73(struct gusto_user *user,
   double R = X[1];
   double z = X[3];
   double r = sqrt(R*R + z*z);
-  double omega = 0.5 * (X[0] < 1 ? X[0] : 1); /* ramps up */
-
-  double Bz = z / pow(r, 3);
+  double omega = 1.0;
   double BR = R / pow(r, 3);
+  double Bz = z / pow(r, 3);
   double Bf = -omega * R / pow(r, 2);
-
-  double Y = 1 - z / r;
-
   double gradY[4] = {0, R*Bz, 0, -R*BR};
   double B[4] = {0, BR, Bf, Bz};
   double E[4] = {0, -omega * gradY[1], 0, -omega * gradY[3]};
   double S[4] = VEC4_CROSS(E, B);
-  double U = VEC4_DOT(B,B);
+  double U = VEC4_DOT(B, B);
   double vm[4] = { 0, S[1]/U, S[2]/U, S[3]/U };
   double u0 = pow(1.0 - VEC4_DOT(vm, vm), -0.5);
   double uR = vm[1] * u0;
   double uf = vm[2] * u0;
   double uz = vm[3] * u0;
   double b0 = uR*BR + uf*Bf + uz*Bz;
-  //double Bp = sqrt(BR*BR + Bz*Bz);
-  //double up = sqrt(uR*uR + uz*uz);
-  double dg = user->density0;// / user->sigma * Bp / up; if (dg > 1) dg = 1;
-  double s0 = user->entropy; /* log(p / rho^Gamma) */
+  double Bp = sqrt(BR*BR + Bz*Bz);
+  double up = sqrt(uR*uR + uz*uz);
+  double dg = user->density0 * Bp / up;
+  double s0 = user->entropy;
   double pg = exp(s0) * pow(dg, gamma_law_index);
 
-  /* printf("B^2/d=%f\n", Bp*Bp/dg); */
-  /* double dg = user->density0; */
-  /* double pg = user->pressure0; */
-
-  A->velocity_four_vector[1] = uR;
   A->velocity_four_vector[2] = uf;
-  A->velocity_four_vector[3] = uz;
-  A->magnetic_four_vector[1] = (BR + b0 * uR) / u0;
+  A->velocity_four_vector[3] = up;
   A->magnetic_four_vector[2] = (Bf + b0 * uf) / u0;
-  A->magnetic_four_vector[3] = (Bz + b0 * uz) / u0;
+  A->magnetic_four_vector[3] = (Bp + b0 * up) / u0;
   A->comoving_mass_density = dg;
   A->gas_pressure = pg;
-  A->vector_potential = Y / R;
 
   return NULL;
 }
@@ -183,18 +174,15 @@ const char **id_narayan07(struct gusto_user *user,
   double up = sqrt(uR*uR + uz*uz);
   double b0 = uR*BR + uf*Bf + uz*Bz;
   double dg = user->density0 * Bp / up;
-  double s0 = user->entropy; /* log(p / rho^Gamma) */
+  double s0 = user->entropy;
   double pg = exp(s0) * pow(dg, gamma_law_index);
 
-  A->velocity_four_vector[1] = uR;
   A->velocity_four_vector[2] = uf;
-  A->velocity_four_vector[3] = uz;
-  A->magnetic_four_vector[1] = (BR + b0 * uR) / u0;
+  A->velocity_four_vector[3] = uR;
   A->magnetic_four_vector[2] = (Bf + b0 * uf) / u0;
-  A->magnetic_four_vector[3] = (Bz + b0 * uz) / u0;
+  A->magnetic_four_vector[3] = (BR + b0 * uR) / u0;
   A->comoving_mass_density = dg;
   A->gas_pressure = pg;
-  A->vector_potential = Y / R;
 
   return NULL;
 }

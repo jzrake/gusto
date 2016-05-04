@@ -142,7 +142,7 @@ double flux_function(double R, double z)
 double poloidal_field(double R, double z, double *BR, double *Bz)
 {
   double dR = R * 1e-6;
-  double dz = z * 1e-6;
+  double dz = 1 * 1e-6; /* !!!! */
 
   double YRm2 = flux_function(R-2*dR, z);
   double YRm1 = flux_function(R-1*dR, z);
