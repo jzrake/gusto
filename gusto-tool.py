@@ -168,6 +168,33 @@ class RadioButtonGroup(QtGui.QWidget):
 
 
 
+class CheckboxGroup(QtGui.QWidget):
+
+    class Signals(QtCore.QObject):
+        state_changed = QtCore.Signal(list)
+
+    def __init__(self, labels, parent=None):
+        super(CheckboxGroup, self).__init__(parent)
+
+        layout = QtGui.QVBoxLayout()
+        buttons = [ ]
+
+        for label in labels:
+            button = QtGui.QCheckBox(label)
+            button.stateChanged.connect(self.handle_state_changed)
+            layout.addWidget(button)
+            buttons.append(button)
+
+        self.setLayout(layout)
+        self.buttons = buttons
+        self.signals = self.Signals()
+
+    def handle_state_changed(self, state):
+        self.signals.state_changed.emit([b.text() for b in self.buttons
+                                         if b.checkState()])
+
+
+
 class PlottingArea(QtGui.QWidget):
 
     def __init__(self):
@@ -188,14 +215,29 @@ class PlottingArea(QtGui.QWidget):
 
         canvas = FigureCanvas(fig)
         navbar = NavigationToolbar(canvas, self)
-        radio_group = RadioButtonGroup(['X', 'R', 'z', 'u0', 'u1', 'u2', 'u3', 'dg', 'pg', '-alfv', '-fast'])
-        radio_group.signals.selection_changed.connect(self.change_variable)
+
+        all_variables = ['X', 'R', 'z', 'u0', 'u1', 'u2', 'u3', 'dg', 'pg', '-alfv', '-fast']
+        #radio_group = RadioButtonGroup(all_variables)
+        #radio_group.signals.selection_changed.connect(self.change_variable)
+
+        var_group = CheckboxGroup(all_variables)
+        var_group.signals.state_changed.connect(self.set_active_variables)
+
+        opt_group = CheckboxGroup(['log x', 'log y'])
+        opt_group.signals.state_changed.connect(self.set_bool_options)
+
+        lw_slider = QtGui.QSlider(QtCore.Qt.Horizontal)
+        lw_slider.setValue(20)
+        lw_slider.setMinimum(5)
+        lw_slider.valueChanged.connect(self.set_line_width)
 
         layout = QtGui.QGridLayout()
         layout.addWidget(canvas, 0, 1)
         layout.addWidget(navbar, 1, 1)
         layout.addWidget(reset_button, 3, 1)
-        layout.addWidget(radio_group, 0, 0, QtCore.Qt.AlignTop)
+        layout.addWidget(var_group, 0, 0, QtCore.Qt.AlignTop)
+        layout.addWidget(opt_group, 1, 0, QtCore.Qt.AlignBottom)
+        layout.addWidget(lw_slider, 2, 0, QtCore.Qt.AlignBottom)
         self.setLayout(layout)
 
         self.fig = fig
@@ -203,7 +245,10 @@ class PlottingArea(QtGui.QWidget):
         self.canvas = canvas
         self.navbar = navbar
 
-        self.variable = 'u0'
+        self.lines = { }
+        self.active_variables = [ ]
+        self.all_variables = all_variables
+        self.active_bools = [ ]
         self.dset_filename = None
         self.reset_plot()
 
@@ -213,39 +258,69 @@ class PlottingArea(QtGui.QWidget):
         self.replot()
 
 
-    def change_variable(self, new_variable):
-        self.variable = new_variable
+    def set_active_variables(self, variables):
+        self.active_variables = variables
         self.replot()
+
+
+    def set_bool_options(self, options):
+        self.active_bools = options
+        self.replot()
+
+
+    def set_line_width(self, lw):
+        for line in self.lines.itervalues():
+            line.set_linewidth(lw / 10.)
+        self.canvas.draw()
 
 
     def reset_plot(self):
         from matplotlib.lines import Line2D
         self.axes.cla()
-        self.line = Line2D([], [])
-        self.axes.add_line(self.line)
+        for key in self.all_variables:
+            self.lines[key] = Line2D([], [])
+            self.axes.add_line(self.lines[key])
         self.replot()
 
 
     def replot(self):
         import gusto_dataset
-
         if not self.dset_filename: return
-        if not self.variable: return
-
         dset = gusto_dataset.GustoDataset(self.dset_filename)
-        x = dset.get_cell_variable('R')
-        y = dset.get_cell_variable(self.variable)
 
-        self.line.set_data(x, y)
+        ylabel = ''
+
+        for key in self.lines:
+            line = self.lines[key]
+            if key in self.active_variables:
+                x = dset.get_cell_variable('R')
+                y = dset.get_cell_variable(key)
+                line.set_data(x, y)
+                line.set_visible(True)
+                line.set_color(self.make_color_from_string_hash(key))
+                if len(self.active_variables) == 1:
+                    ylabel = key
+            else:
+                line.set_visible(False)
+
+        self.axes.set_xscale('log' if 'log x' in self.active_bools else 'linear')
+        self.axes.set_yscale('log' if 'log y' in self.active_bools else 'linear')
+
         self.axes.relim(visible_only=True)
         self.axes.autoscale_view()
         self.axes.set_title(self.dset_filename)
         self.axes.set_xlabel('R')
-        self.axes.set_ylabel(self.variable)
+        self.axes.set_ylabel(ylabel)
         self.canvas.draw()
 
         dset.close()
 
+
+    def make_color_from_string_hash(self, key):
+        r = (hash(key) >> 0*8) % 256
+        g = (hash(key) >> 1*8) % 256
+        b = (hash(key) >> 2*8) % 256
+        return [r/256., g/256., b/256.]
 
 
 class MainWindow(QtGui.QWidget):
