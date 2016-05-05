@@ -11,11 +11,9 @@ struct gusto_user {
     char coordinates;
     double cfl;
     int rk_order;
-    int move_cells;
-    double mesh_stagger;
     char boundary_con[256];
-    char initial_mesh[256];
     char initial_data[256];
+    double entropy;
     double pressure0;
     double pressure1;
     double density0;
@@ -23,7 +21,8 @@ struct gusto_user {
     double fourvel0;
     double fourvel1;
     double sigma;
-    double entropy;
+    char validate_geom;
+    int validate_flux;
 };
 
 

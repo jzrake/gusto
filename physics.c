@@ -199,7 +199,7 @@ void gusto_default_aux(struct aux_variables *A)
 {
   A->comoving_mass_density = 1.0;
   A->gas_pressure = 1.0;
-  A->vector_potential = 0.0;
+  A->flux_function = 0.0;
   A->velocity_four_vector[1] = 0.0;
   A->velocity_four_vector[2] = 0.0;
   A->velocity_four_vector[3] = 0.0;
@@ -448,6 +448,34 @@ int gusto_fluxes(struct aux_variables *A,
   F[S22] *= G->cylindrical_radius;
 
   return 0;
+}
+
+
+
+void gusto_measure(struct aux_variables *A,
+		   struct aux_geometry *G,
+		   struct aux_measure *M)
+{
+  double *u = A->velocity_four_vector;
+  double *b = A->magnetic_four_vector;
+  double pg = A->gas_pressure;
+  double dg = A->comoving_mass_density;
+  double bb = b[1]*b[1] + b[2]*b[2] + b[3]*b[3] - b[0]*b[0];
+  double nhat[4] = {0, 0, 0, 1};
+
+  gusto_fluxes(A, G, nhat, M->F);
+  gusto_wavespeeds(A, nhat, M->L);
+
+  double dA = G->area_element[3];
+  for (int q=0; q<5; ++q) M->F[q] *= dA;
+
+  M->F[B22] *= G->line_element[2];
+
+  M->sigma = bb / dg;
+  M->entropy = pg / pow(dg, gamma_law_index);
+  M->B[1] = b[1] * u[0] - b[0] * u[1];
+  M->B[2] = b[2] * u[0] - b[0] * u[2];
+  M->B[3] = b[3] * u[0] - b[0] * u[3];
 }
 
 

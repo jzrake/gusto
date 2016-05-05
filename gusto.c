@@ -138,9 +138,13 @@ int main(int argc, char **argv)
   gusto_mesh_report(&sim);
 
   gusto_initial_data(&sim);
-  gusto_validate_fluxes(&sim);
-  /* gusto_validate_geometry(&sim); */
 
+  if (sim.user.validate_flux) {
+    gusto_validate_fluxes(&sim);
+  }
+  if (sim.user.validate_geom != 'x') {
+    gusto_validate_geometry(&sim);
+  }
 
   while (sim.status.time_simulation < sim.user.tmax) {
 

@@ -3,12 +3,14 @@
 #include "gusto.h"
 
 
-#define PARABOLOIDAL 0
-#define MONOPOLE 1
+#define PARABOLOIDAL 1
+#define MONOPOLE 0
 
-static double poloidal_field(double R, double z, double *BR, double *Bz);
-static double flux_function(double R, double z);
 
+static double poloidal_field(struct gusto_sim *sim,
+			     double R, double z, double *BR, double *Bz);
+static double flux_function(struct gusto_sim *sim,
+			    double R, double z);
 
 int gusto_validate_geometry(struct gusto_sim *sim)
 {
@@ -26,13 +28,14 @@ int gusto_validate_geometry(struct gusto_sim *sim)
       double dXB_tru = 0;
       double dXR_tru = 0;
 
-      if (PARABOLOIDAL) {
-	dXB_tru = (pow(1 + pow(Y/R, +2), -2.0) - 1) * 2 / (R * R);
-	dXR_tru =  pow(1 + pow(Y/R, -2), -0.5);
-      }
-      if (MONOPOLE) {
+      /* Why do these formulae only work when z starts at 0? */
+      if (sim->user.validate_geom == 'm') { /* monopole */
 	dXB_tru = -2 * pow(R, -3);
 	dXR_tru = 1.0;
+      }
+      if (sim->user.validate_geom == 'p') { /* paraboloidal */
+	dXB_tru = (pow(1 + pow(Y/R, +2), -2.0) - 1) * 2 / (R * R);
+	dXR_tru =  pow(1 + pow(Y/R, -2), -0.5);
       }
 
       printf("dB/dX = [%e %e], dR/dX = [%e %e]\n",
@@ -46,12 +49,13 @@ int gusto_validate_geometry(struct gusto_sim *sim)
 
 
 
-void gusto_geometry(struct aux_geometry *G, double y[4])
+void gusto_geometry(struct gusto_sim *sim,
+		    struct aux_geometry *G, double y[4])
 {
   double BR, Bz;
   double R = y[1];
   double z = y[3];
-  double B = poloidal_field(R, z, &BR, &Bz);
+  double B = poloidal_field(sim, R, z, &BR, &Bz);
   double h[4] = { -1, 1 / (B * R), R, 1 };
   G->cylindrical_radius = R;
   G->poloidal_field = B;
@@ -99,16 +103,16 @@ double gusto_geometry_step_along_field(struct gusto_sim *sim,
   double dR3, dz3;
   double dR4, dz4;
 
-  Bp = poloidal_field(R, z, &BR, &Bz);
+  Bp = poloidal_field(sim, R, z, &BR, &Bz);
   dR1 = dchi * BR / Bp;
   dz1 = dchi * Bz / Bp;
-  Bp = poloidal_field(R + 0.5 * dR1, z + 0.5 * dz1, &BR, &Bz);
+  Bp = poloidal_field(sim, R + 0.5 * dR1, z + 0.5 * dz1, &BR, &Bz);
   dR2 = dchi * BR / Bp;
   dz2 = dchi * Bz / Bp;
-  Bp = poloidal_field(R + 0.5 * dR2, z + 0.5 * dz2, &BR, &Bz);
+  Bp = poloidal_field(sim, R + 0.5 * dR2, z + 0.5 * dz2, &BR, &Bz);
   dR3 = dchi * BR / Bp;
   dz3 = dchi * Bz / Bp;
-  Bp = poloidal_field(R + 1.0 * dR3, z + 1.0 * dz3, &BR, &Bz);
+  Bp = poloidal_field(sim, R + 1.0 * dR3, z + 1.0 * dz3, &BR, &Bz);
   dR4 = dchi * BR / Bp;
   dz4 = dchi * Bz / Bp;
 
@@ -117,8 +121,10 @@ double gusto_geometry_step_along_field(struct gusto_sim *sim,
 
   /* Also compute the change of poloidal field magnitude for the given step dchi
      along the field line. */
-  double Bp0 = poloidal_field(R, z, &BR, &Bz);
-  double Bp1 = poloidal_field(R + *dR, z + *dz, &BR, &Bz);
+  double Bp0 = poloidal_field(sim, R, z, &BR, &Bz);
+  double Bp1 = poloidal_field(sim, R + *dR, z + *dz, &BR, &Bz);
+
+  /* printf("%12.8f\n", flux_function(sim, R, z)); */
 
   *dB = Bp1 - Bp0;
 
@@ -127,31 +133,30 @@ double gusto_geometry_step_along_field(struct gusto_sim *sim,
 
 
 
-double flux_function(double R, double z)
+double flux_function(struct gusto_sim *sim, double R, double z)
 {
-  if (PARABOLOIDAL) {
-    return sqrt(R*R + z*z) - z;
-  }
-  if (MONOPOLE) {
-    return 1 - z / sqrt(R*R + z*z);
-  }
+  double y[4] = {0, R, 0, z};
+  struct aux_variables A;
+  sim->initial_data(&sim->user, &A, y);
+  return A.flux_function;
 }
 
 
 
-double poloidal_field(double R, double z, double *BR, double *Bz)
+double poloidal_field(struct gusto_sim *sim,
+		      double R, double z, double *BR, double *Bz)
 {
-  double dR = R * 1e-6;
-  double dz = 1 * 1e-6; /* !!!! */
+  double dR = 1 * 1e-4;
+  double dz = 1 * 1e-4;
 
-  double YRm2 = flux_function(R-2*dR, z);
-  double YRm1 = flux_function(R-1*dR, z);
-  double YRp1 = flux_function(R+1*dR, z);
-  double YRp2 = flux_function(R+2*dR, z);
-  double Yzm2 = flux_function(R, z-2*dz);
-  double Yzm1 = flux_function(R, z-1*dz);
-  double Yzp1 = flux_function(R, z+1*dz);
-  double Yzp2 = flux_function(R, z+2*dz);
+  double YRm2 = flux_function(sim, R-2*dR, z);
+  double YRm1 = flux_function(sim, R-1*dR, z);
+  double YRp1 = flux_function(sim, R+1*dR, z);
+  double YRp2 = flux_function(sim, R+2*dR, z);
+  double Yzm2 = flux_function(sim, R, z-2*dz);
+  double Yzm1 = flux_function(sim, R, z-1*dz);
+  double Yzp1 = flux_function(sim, R, z+1*dz);
+  double Yzp2 = flux_function(sim, R, z+2*dz);
 
   double dRY = (-YRp2 + 8 * YRp1 - 8 * YRm1 + YRm2) / (12 * dR);
   double dzY = (-Yzp2 + 8 * Yzp1 - 8 * Yzm1 + Yzm2) / (12 * dz);

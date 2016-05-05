@@ -52,6 +52,22 @@
 
 
 
+#define WRITE_VARIABLE_MEAS(member, alias) do {				\
+    struct mesh_cell *C = sim->rows[n].cells;				\
+    struct aux_measure M;						\
+    for (int i=0; i<data_size; ++i) {					\
+      gusto_measure(&C->aux, &C->geom, &M);				\
+      data[i] = M.member;						\
+      C = C->next;							\
+    }									\
+    hid_t set = H5Dcreate(cg, alias, H5T_NATIVE_DOUBLE, spc,		\
+			  H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);	\
+    H5Dwrite(set, H5T_NATIVE_DOUBLE, spc, spc, H5P_DEFAULT, data);	\
+    H5Dclose(set);							\
+  } while(0)								\
+
+
+
 void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname)
 {
   char default_name[64];
@@ -94,13 +110,18 @@ void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname)
       WRITE_VARIABLE_CELL(aux.magnetic_four_vector[3], "b3");
       WRITE_VARIABLE_CELL(aux.comoving_mass_density, "dg");
       WRITE_VARIABLE_CELL(aux.gas_pressure, "pg");
-      WRITE_VARIABLE_WAVESPEED(0, "-fast");
-      WRITE_VARIABLE_WAVESPEED(1, "-alfv");
-      WRITE_VARIABLE_WAVESPEED(2, "-slow");
-      WRITE_VARIABLE_WAVESPEED(3, "fluid");
-      WRITE_VARIABLE_WAVESPEED(5, "+slow");
-      WRITE_VARIABLE_WAVESPEED(6, "+alfv");
-      WRITE_VARIABLE_WAVESPEED(7, "+fast");
+
+      WRITE_VARIABLE_MEAS(sigma, "sigma");
+      WRITE_VARIABLE_MEAS(entropy, "entropy");
+      WRITE_VARIABLE_MEAS(L[0], "-fast");
+      WRITE_VARIABLE_MEAS(L[1], "-alfv");
+      WRITE_VARIABLE_MEAS(L[2], "-slow");
+      WRITE_VARIABLE_MEAS(L[5], "+slow");
+      WRITE_VARIABLE_MEAS(L[6], "+alfv");
+      WRITE_VARIABLE_MEAS(L[7], "+fast");
+      WRITE_VARIABLE_MEAS(F[DDD], "flux:mass");
+      WRITE_VARIABLE_MEAS(F[TAU], "flux:energy");
+      WRITE_VARIABLE_MEAS(F[S22], "flux:angmom");
 
       free(data);
       H5Sclose(spc);

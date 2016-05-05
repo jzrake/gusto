@@ -15,11 +15,9 @@ user_struct = [
     ('coordinates', 'char', 'p'),
     ('cfl', 'double', 0.5),
     ('rk_order', 'int', 2),
-    ('move_cells', 'int', 0),
-    ('mesh_stagger', 'double', 0.0),
-    ('boundary_con', 'char[256]', 'none'),
-    ('initial_mesh', 'char[256]', 'planar'),
-    ('initial_data', 'char[256]', 'uniform'),
+    ('boundary_con', 'char[256]', 'inflow_outflow'),
+    ('initial_data', 'char[256]', 'michel69'),
+    ('entropy', 'double', 0.0),
     ('pressure0', 'double', 1.0),
     ('pressure1', 'double', 1.0),
     ('density0', 'double', 1.0),
@@ -27,7 +25,8 @@ user_struct = [
     ('fourvel0', 'double', 0.0),
     ('fourvel1', 'double', 0.0),
     ('sigma', 'double', 1.0),
-    ('entropy', 'double', 1.0)
+    ('validate_geom', 'char', 'x'), # ['x', 'm', 'p']
+    ('validate_flux', 'int', 0),
 ]
 
 

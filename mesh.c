@@ -126,7 +126,7 @@ void gusto_mesh_generate(struct gusto_sim *sim)
 
     double X = 1.0;
     double R = R0;
-    double z = 1.0;//1e-4; /* !!!!! */
+    double z = 0.0;
     double dX, dR, dz, dB, Bp;
 
     for (int i=0; i<row_size+1; ++i) {
@@ -187,7 +187,7 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
   for (int n=0; n<sim->num_rows; ++n) {
 
     for (F=sim->rows[n].faces; F; F=F->next) {
-      gusto_geometry(&F->geom, F->y);
+      gusto_geometry(sim, &F->geom, F->y);
 
       F->dA[0] = F->geom.area_element[3];
       F->dA[1] = F->geom.line_element[1];
@@ -206,7 +206,7 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
       C->x[3] = 0.5 * (C->faces[0]->x[3] + C->faces[1]->x[3]);
 
       /* Compute the scale factors for that position. */
-      gusto_geometry(&C->geom, C->y);
+      gusto_geometry(sim, &C->geom, C->y);
 
       C->geom.dXB = (C->faces[1]->geom.poloidal_field -
 		     C->faces[0]->geom.poloidal_field) / dX;

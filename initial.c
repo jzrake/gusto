@@ -44,6 +44,7 @@ const char **id_michel69(struct gusto_user *user,
   double z = X[3];
   double r = sqrt(R*R + z*z);
   double c = 1.0;
+  double Y = 1 - z / sqrt(R*R + z*z);
   double Phi = 1.0;
   double sig = user->sigma;
   double eta = pow(sig, 1./3);
@@ -84,6 +85,7 @@ const char **id_michel69(struct gusto_user *user,
   A->magnetic_four_vector[3] = br / sqrt(4 * M_PI);
   A->comoving_mass_density = d;
   A->gas_pressure = p;
+  A->flux_function = Y;
 
   return NULL;
 }
@@ -103,6 +105,7 @@ const char **id_michel73(struct gusto_user *user,
   double R = X[1];
   double z = X[3];
   double r = sqrt(R*R + z*z);
+  double Y = 1 - z / sqrt(R*R + z*z);
   double omega = 1.0;
   double BR = R / pow(r, 3);
   double Bz = z / pow(r, 3);
@@ -130,6 +133,7 @@ const char **id_michel73(struct gusto_user *user,
   A->magnetic_four_vector[3] = (Bp + b0 * up) / u0;
   A->comoving_mass_density = dg;
   A->gas_pressure = pg;
+  A->flux_function = Y;
 
   return NULL;
 }
@@ -183,6 +187,7 @@ const char **id_narayan07(struct gusto_user *user,
   A->magnetic_four_vector[3] = (BR + b0 * uR) / u0;
   A->comoving_mass_density = dg;
   A->gas_pressure = pg;
+  A->flux_function = Y;
 
   return NULL;
 }
