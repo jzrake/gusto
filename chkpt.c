@@ -111,6 +111,8 @@ void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname)
       WRITE_VARIABLE_CELL(aux.comoving_mass_density, "dg");
       WRITE_VARIABLE_CELL(aux.gas_pressure, "pg");
 
+      WRITE_VARIABLE_MEAS(B[2], "B:tor");
+      WRITE_VARIABLE_MEAS(B[3], "B:pol");
       WRITE_VARIABLE_MEAS(sigma, "sigma");
       WRITE_VARIABLE_MEAS(entropy, "entropy");
       WRITE_VARIABLE_MEAS(L[0], "-fast");

@@ -146,9 +146,10 @@ class PlottingArea(QtGui.QWidget):
         navbar = NavigationToolbar(canvas, self)
 
         all_variables = ['X', 'R', 'z',
-                         'u0', 'u2', 'u3', 'b2', 'b3',
+                         'u0', 'u2', 'u3',
                          'dg', 'pg', 'entropy', 'sigma',
                          '-slow', '-alfv', '-fast',
+                         'B:tor', 'B:pol',
                          'flux:mass',
                          'flux:energy',
                          'flux:angmom']

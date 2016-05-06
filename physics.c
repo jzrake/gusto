@@ -100,7 +100,7 @@ void gusto_cache_rk(struct gusto_sim *sim)
 
   for (int n=0; n<sim->num_rows; ++n) {
     DL_FOREACH(sim->rows[n].cells, C) {
-      for (int q=0; q<5; ++q) {
+      for (int q=0; q<8; ++q) {
 	C->U_rk[q] = C->U[q];
       }
     }
@@ -121,7 +121,7 @@ void gusto_average_rk(struct gusto_sim *sim, double b)
 
   for (int n=0; n<sim->num_rows; ++n) {
     DL_FOREACH(sim->rows[n].cells, C) {
-      for (int q=0; q<5; ++q) {
+      for (int q=0; q<8; ++q) {
 	C->U[q] = b * C->U[q] + (1 - b) * C->U_rk[q];
       }
     }
