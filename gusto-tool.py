@@ -5,10 +5,80 @@ import os
 from PySide import QtGui, QtCore
 
 
+
+class RunController(QtGui.QWidget):
+
+    def __init__(self, parent=None):
+        super(RunController, self).__init__(parent)
+
+        font = QtGui.QFont("Monospace")
+        font.setStyleHint(QtGui.QFont.TypeWriter)
+        font.setPointSize(8)
+
+        run_button = QtGui.QPushButton('Run')
+        run_button.clicked.connect(self.handle_run_button)
+
+        output_display = QtGui.QTextEdit()
+        output_display.setReadOnly(True)
+        output_display.setLineWrapMode(QtGui.QTextEdit.NoWrap)
+        output_display.setCurrentFont(font)
+
+
+        base_runcfg = QtGui.QComboBox()
+        for f in os.listdir('.'):
+            if f.endswith('.cfg'):
+                base_runcfg.addItem(f)
+
+        input_runcfg = QtGui.QTextEdit()
+        input_runcfg.setMaximumHeight(128)
+        input_runcfg.setPlainText('\n'.join(["tmax=0",
+                                             "outdir=."]))
+
+        layout = QtGui.QVBoxLayout()
+        layout.addWidget(base_runcfg)
+        layout.addWidget(input_runcfg)
+        layout.addWidget(output_display)
+        layout.addWidget(run_button)
+
+        self.setLayout(layout)
+        self.base_runcfg = base_runcfg
+        self.input_runcfg = input_runcfg
+        self.output_display = output_display
+        self.run_button = run_button
+
+
+    def handle_run_button(self):
+        self.run_button.setEnabled(False)
+        self.run_button.setText("Running...")
+        command = "./gusto"
+        base_cfg_file = open(self.base_runcfg.currentText(), 'r')
+        args = [ ]
+        args += base_cfg_file.read().split()
+        args += self.input_runcfg.toPlainText().split()
+        base_cfg_file.close()
+        process = QtCore.QProcess(self)
+        self.process = process
+        process.finished.connect(self.finished)
+        process.readyReadStandardOutput.connect(self.handle_stdout)
+        process.start(command, args)
+
+
+    def finished(self, exitCode):
+        self.run_button.setEnabled(True)
+        self.run_button.setText("Run")
+
+
+    def handle_stdout(self):
+        out = str(self.process.readAllStandardOutput())
+        self.output_display.append(out)
+        scroll = self.output_display.verticalScrollBar()
+        scroll.setValue(scroll.maximum())
+
+
+
 class FileBrowser(QtGui.QWidget):
 
     class Signals(QtCore.QObject):
-        files_loaded = QtCore.Signal(list, list)
         file_changed = QtCore.Signal(str)
 
     def __init__(self, parent=None):
@@ -25,37 +95,29 @@ class FileBrowser(QtGui.QWidget):
         tree_view.setModel(model)
         tree_view.setRootIndex(model.index(os.getcwd()))
         tree_view.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
-        tree_view.hideColumn(1)
-        tree_view.hideColumn(2)
-        tree_view.hideColumn(3)
+        #tree_view.hideColumn(1)
+        #tree_view.hideColumn(2)
+        #tree_view.hideColumn(3)
 
         selection_model = tree_view.selectionModel()
         selection_model.currentChanged.connect(self.handle_current_changed)
 
-        load_button = QtGui.QPushButton('Load')
-        load_button.clicked.connect(self.handle_load_button)
+        watcher = QtCore.QFileSystemWatcher()
+        watcher.fileChanged.connect(self.current_file_modified)
+
+        timer = QtCore.QTimer()
+        timer.setSingleShot(True)
+        timer.timeout.connect(self.timer_timed_out)
 
         layout = QtGui.QVBoxLayout()
         layout.addWidget(tree_view)
-        layout.addWidget(load_button)
 
         self.setLayout(layout)
         self.model = model
         self.tree_view = tree_view
+        self.watcher = watcher
+        self.timer = timer
         self.signals = self.Signals()
-
-
-    def handle_load_button(self):
-        dirs = [ ]
-        files = [ ]
-        for index in self.tree_view.selectedIndexes():
-            if index.column() != 0: continue
-            filename = self.model.filePath(index)
-            if os.path.isdir(filename):
-                dirs.append(filename)
-            else:
-                files.append(filename)
-        self.signals.files_loaded.emit(files, dirs)
 
 
     def resize_tree_view(self):
@@ -65,7 +127,22 @@ class FileBrowser(QtGui.QWidget):
 
     def handle_current_changed(self, index):
         filename = self.model.filePath(index)
+        self.current_filename = filename
         self.signals.file_changed.emit(filename)
+        for f in self.watcher.files():
+            self.watcher.removePath(f)
+        self.watcher.addPath(filename)
+
+
+    def current_file_modified(self):
+        if self.timer.isActive():
+            pass
+        else:
+            self.timer.start(250)
+
+
+    def timer_timed_out(self):
+        self.signals.file_changed.emit(self.current_filename)
 
 
 
@@ -232,6 +309,7 @@ class PlottingArea(QtGui.QWidget):
         self.axes.cla()
         for key in self.all_variables:
             self.lines[key] = Line2D([], [])
+            self.lines[key].set_linewidth(2)
             self.axes.add_line(self.lines[key])
         self.reload_data()
         self.draw()
@@ -240,7 +318,7 @@ class PlottingArea(QtGui.QWidget):
     def reload_data(self):
         import gusto_dataset
 
-        if self.dset_filename == None:
+        if self.dset_filename == None or not os.path.isfile(self.dset_filename):
             for line in self.lines.itervalues():
                 line.set_visible(False)
             return
@@ -262,7 +340,6 @@ class PlottingArea(QtGui.QWidget):
     def draw(self):
         ylabel = ''
         title = os.path.basename(self.dset_filename) if self.dset_filename else ''
-
         self.axes.set_xscale('log' if 'log x' in self.active_bools else 'linear')
         self.axes.set_yscale('log' if 'log y' in self.active_bools else 'linear')
         self.axes.relim(visible_only=True)
@@ -273,13 +350,12 @@ class PlottingArea(QtGui.QWidget):
         self.canvas.draw()
 
 
-
-
     def make_color_from_string_hash(self, key):
         r = (hash(key) >> 0*8) % 256
         g = (hash(key) >> 1*8) % 256
         b = (hash(key) >> 2*8) % 256
         return [r/256., g/256., b/256.]
+
 
 
 class MainWindow(QtGui.QWidget):
@@ -290,14 +366,22 @@ class MainWindow(QtGui.QWidget):
         self.setWindowTitle("Gusto tool")
 
         file_browser = FileBrowser()
+        run_controller = RunController()
         plotting_area = PlottingArea()
 
         file_browser.signals.file_changed.connect(plotting_area.set_dset_filename)
 
-        layout = QtGui.QHBoxLayout()
-        layout.addWidget(file_browser)
-        layout.addWidget(plotting_area)
-        self.setLayout(layout)
+        columnL = QtGui.QVBoxLayout()
+        columnR = QtGui.QVBoxLayout()
+
+        columnL.addWidget(file_browser)
+        columnL.addWidget(run_controller)
+        columnR.addWidget(plotting_area)
+
+        main_row = QtGui.QHBoxLayout()
+        main_row.addLayout(columnL)
+        main_row.addLayout(columnR)
+        self.setLayout(main_row)
 
 
 

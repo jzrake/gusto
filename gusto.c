@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <sys/stat.h> /* mkdir */
 #include "gusto.h"
 
 
@@ -111,19 +112,15 @@ int main(int argc, char **argv)
 
 
   if (restarted_run) {
-
     /* put restart code here */
-
   }
-
   else {
-
     sim.status.time_last_checkpoint = -sim.user.cpi;
     sim.status.checkpoint_number = -1;
-
   }
 
 
+  mkdir(sim.user.outdir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
   gusto_user_report(&sim.user);
   gusto_config_from_user(&sim);
   gusto_print_help(&sim);
@@ -199,7 +196,10 @@ int main(int argc, char **argv)
     sim.status.iteration += 1;
   }
 
-  gusto_write_checkpoint(&sim, "chkpt.final.h5");
+  char chkpt_final[256];
+  snprintf(chkpt_final, 256, "%s/chkpt.final.h5", sim.user.outdir);
+  gusto_write_checkpoint(&sim, chkpt_final);
+
   gusto_free(&sim);
   return 0;
 }

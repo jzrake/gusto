@@ -70,11 +70,13 @@
 
 void gusto_write_checkpoint(struct gusto_sim *sim, const char *fname)
 {
-  char default_name[64];
+  char default_name[256];
   char row_name[64];
 
   if (fname == NULL) {
-    snprintf(default_name, 64, "chkpt.%04d.h5", sim->status.checkpoint_number);
+    snprintf(default_name, 256, "%s/chkpt.%04d.h5",
+	     sim->user.outdir,
+	     sim->status.checkpoint_number);
     fname = default_name;
   }
   printf("[gusto] writing checkpoint %s\n", fname);
