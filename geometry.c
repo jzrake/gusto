@@ -146,8 +146,8 @@ double flux_function(struct gusto_sim *sim, double R, double z)
 double poloidal_field(struct gusto_sim *sim,
 		      double R, double z, double *BR, double *Bz)
 {
-  double dR = 1 * 1e-4;
-  double dz = 1 * 1e-4;
+  double dR = 1 * 1e-6;
+  double dz = 1 * 1e-6;
 
   double YRm2 = flux_function(sim, R-2*dR, z);
   double YRm1 = flux_function(sim, R-1*dR, z);

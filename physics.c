@@ -48,7 +48,7 @@ int gusto_validate_fluxes(struct gusto_sim *sim)
 	     F[1] * dA,
 	     F[2] * dA,
 	     F[3] * dA,
-	     F[4] * dA, F[B22] * C->geom.line_element[2], dA);
+	     F[4] * dA, F[B22] * C->geom.area_element[2], dA);
 
     }
   }
@@ -466,10 +466,10 @@ void gusto_measure(struct aux_variables *A,
   gusto_fluxes(A, G, nhat, M->F);
   gusto_wavespeeds(A, nhat, M->L);
 
-  double dA = G->area_element[3];
-  for (int q=0; q<5; ++q) M->F[q] *= dA;
-
-  M->F[B22] *= G->line_element[2];
+  M->F[DDD] *= G->area_element[3];
+  M->F[TAU] *= G->area_element[3];
+  M->F[S22] *= G->area_element[3];
+  M->F[B22] *= G->area_element[2];
 
   M->sigma = bb / dg;
   M->entropy = pg / pow(dg, gamma_law_index);

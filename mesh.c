@@ -190,9 +190,9 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
       gusto_geometry(sim, &F->geom, F->y);
 
       F->dA[0] = F->geom.area_element[3];
-      F->dA[1] = F->geom.line_element[1];
-      F->dA[2] = F->geom.line_element[2];
-      F->dA[3] = F->geom.line_element[3];
+      F->dA[1] = F->geom.area_element[1];
+      F->dA[2] = F->geom.area_element[2];
+      F->dA[3] = F->geom.area_element[3];
     }
 
     for (C=sim->rows[n].cells; C; C=C->next) {
@@ -216,7 +216,7 @@ void gusto_mesh_compute_geometry(struct gusto_sim *sim)
       /* These are the cell's volume element (dA[0]), and area elements along
 	 each axis. */
       C->dA[0] = C->geom.volume_element  * dX;
-      C->dA[1] = 1.0;
+      C->dA[1] = C->geom.area_element[1] * dX;
       C->dA[2] = C->geom.area_element[2] * dX;
       C->dA[3] = C->geom.area_element[3];
 

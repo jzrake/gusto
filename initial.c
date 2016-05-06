@@ -169,7 +169,7 @@ const char **id_narayan07(struct gusto_user *user,
   double B[4] = {0, BR, Bf, Bz};
   double E[4] = {0, -omega * gradY[1], 0, -omega * gradY[3]};
   double S[4] = VEC4_CROSS(E, B);
-  double U = VEC4_DOT(B,B);
+  double U = VEC4_DOT(B, B);
   double vm[4] = { 0, S[1]/U, S[2]/U, S[3]/U };
   double u0 = pow(1.0 - VEC4_DOT(vm, vm), -0.5);
   double uR = vm[1] * u0;
@@ -182,9 +182,9 @@ const char **id_narayan07(struct gusto_user *user,
   double pg = exp(s0) * pow(dg, gamma_law_index);
 
   A->velocity_four_vector[2] = uf;
-  A->velocity_four_vector[3] = uR;
+  A->velocity_four_vector[3] = up;
   A->magnetic_four_vector[2] = (Bf + b0 * uf) / u0;
-  A->magnetic_four_vector[3] = (BR + b0 * uR) / u0;
+  A->magnetic_four_vector[3] = (Bp + b0 * up) / u0;
   A->comoving_mass_density = dg;
   A->gas_pressure = pg;
   A->flux_function = Y;
