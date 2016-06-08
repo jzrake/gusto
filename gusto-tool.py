@@ -5,7 +5,6 @@ import os
 from PySide import QtGui, QtCore
 
 
-
 class RunController(QtGui.QWidget):
 
     def __init__(self, parent=None):
@@ -16,13 +15,19 @@ class RunController(QtGui.QWidget):
         font.setPointSize(8)
 
         run_button = QtGui.QPushButton('Run')
+        bld_button = QtGui.QPushButton('Build')
+
         run_button.clicked.connect(self.handle_run_button)
+        bld_button.clicked.connect(self.handle_bld_button)
+
+        button_grp = QtGui.QHBoxLayout()
+        button_grp.addWidget(run_button)
+        button_grp.addWidget(bld_button)
 
         output_display = QtGui.QTextEdit()
         output_display.setReadOnly(True)
         output_display.setLineWrapMode(QtGui.QTextEdit.NoWrap)
         output_display.setCurrentFont(font)
-
 
         base_runcfg = QtGui.QComboBox()
         for f in os.listdir('.'):
@@ -38,13 +43,31 @@ class RunController(QtGui.QWidget):
         layout.addWidget(base_runcfg)
         layout.addWidget(input_runcfg)
         layout.addWidget(output_display)
-        layout.addWidget(run_button)
+        layout.addLayout(button_grp)
 
         self.setLayout(layout)
         self.base_runcfg = base_runcfg
         self.input_runcfg = input_runcfg
         self.output_display = output_display
         self.run_button = run_button
+        self.bld_button = bld_button
+
+
+    def handle_bld_button(self):
+        self.bld_button.setEnabled(False)
+        self.bld_button.setText("Running...")
+        command = "make"
+        args = [ ]
+        process = QtCore.QProcess(self)
+        self.process = process
+        process.finished.connect(self.bld_finished)
+        process.readyReadStandardOutput.connect(self.handle_stdout)
+        process.start(command, args)
+
+
+    def bld_finished(self, exitCode):
+        self.bld_button.setEnabled(True)
+        self.bld_button.setText("Build")
 
 
     def handle_run_button(self):
@@ -58,19 +81,19 @@ class RunController(QtGui.QWidget):
         base_cfg_file.close()
         process = QtCore.QProcess(self)
         self.process = process
-        process.finished.connect(self.finished)
+        process.finished.connect(self.run_finished)
         process.readyReadStandardOutput.connect(self.handle_stdout)
         process.start(command, args)
 
 
-    def finished(self, exitCode):
+    def run_finished(self, exitCode):
         self.run_button.setEnabled(True)
         self.run_button.setText("Run")
 
 
     def handle_stdout(self):
         out = str(self.process.readAllStandardOutput())
-        self.output_display.append(out)
+        self.output_display.append(out.strip())
         scroll = self.output_display.verticalScrollBar()
         scroll.setValue(scroll.maximum())
 
@@ -131,7 +154,8 @@ class FileBrowser(QtGui.QWidget):
         self.signals.file_changed.emit(filename)
         for f in self.watcher.files():
             self.watcher.removePath(f)
-        self.watcher.addPath(filename)
+        if os.path.isfile(filename):
+            self.watcher.addPath(filename)
 
 
     def current_file_modified(self):
