@@ -34,24 +34,6 @@
 
 
 
-#define WRITE_VARIABLE_WAVESPEED(member, alias) do {			\
-    struct mesh_cell *C = sim->rows[n].cells;				\
-    double u, evals[8];							\
-    double Xhat[4] = {0, 0, 0, 1};					\
-    for (int i=0; i<data_size; ++i) {					\
-      gusto_wavespeeds(&C->aux, Xhat, evals);				\
-      u = evals[member] / sqrt(1 - pow(evals[member], 2));		\
-      data[i] = u;							\
-      C = C->next;							\
-    }									\
-    hid_t set = H5Dcreate(cg, alias, H5T_NATIVE_DOUBLE, spc,		\
-			  H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);	\
-    H5Dwrite(set, H5T_NATIVE_DOUBLE, spc, spc, H5P_DEFAULT, data);	\
-    H5Dclose(set);							\
-  } while(0)								\
-
-
-
 #define WRITE_VARIABLE_MEAS(member, alias) do {				\
     struct mesh_cell *C = sim->rows[n].cells;				\
     struct aux_measure M;						\
