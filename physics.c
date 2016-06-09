@@ -297,7 +297,8 @@ int gusto_from_conserved(struct aux_variables *A,
 
   Uin[S22] /= G->cylindrical_radius;
 
-  srmhd_c2p_set_pressure_floor(c2p, -1.0);
+  /* srmhd_c2p_set_pressure_floor(c2p, -1.0); */
+  srmhd_c2p_set_pressure_floor(c2p, 1e-3 * Uin[DDD]);
   srmhd_c2p_set_gamma(c2p, gamma_law_index);
   srmhd_c2p_new_state(c2p, Uin);
   srmhd_c2p_estimate_from_cons(c2p);
@@ -333,9 +334,12 @@ int gusto_from_conserved(struct aux_variables *A,
 
   if (error != 0) {
     printf("[gusto] ERROR: %s\n", srmhd_c2p_get_error(c2p, error));
-    printf("[gusto] failed on U = [%f %f %f %f %f %f %f %f]\n",
+    printf("[gusto] failed on U = [%+5.4e %+5.4e %+5.4e %+5.4e %+5.4e %+5.4e %+5.4e %+5.4e]\n",
 	   Uin[0], Uin[1], Uin[2], Uin[3],
 	   Uin[4], Uin[5], Uin[6], Uin[7]);
+  }
+  else if (srmhd_c2p_put_pressure_floor(c2p)) {
+    printf("[gusto] WARNING: %s\n", "used pressure floor");
   }
 
   srmhd_c2p_del(c2p);
@@ -460,7 +464,6 @@ void gusto_measure(struct aux_variables *A,
   double *b = A->magnetic_four_vector;
   double pg = A->gas_pressure;
   double dg = A->comoving_mass_density;
-  double bb = b[1]*b[1] + b[2]*b[2] + b[3]*b[3] - b[0]*b[0];
   double nhat[4] = {0, 0, 0, 1};
 
   gusto_fluxes(A, G, nhat, M->F);
@@ -471,7 +474,7 @@ void gusto_measure(struct aux_variables *A,
   M->F[S22] *= G->area_element[3];
   M->F[B22] *= G->area_element[2];
 
-  M->sigma = bb / dg;
+  M->sigma = b[2]*b[2] / dg;
   M->entropy = pg / pow(dg, gamma_law_index);
   M->B[1] = b[1] * u[0] - b[0] * u[1];
   M->B[2] = b[2] * u[0] - b[0] * u[2];
@@ -562,6 +565,9 @@ void bc_inflow(struct gusto_sim *sim)
     struct mesh_cell *C0 = sim->rows[n].cells;
     struct mesh_cell *C1 = sim->rows[n].cells->prev;
 
+    C0->y[0] = sim->status.time_simulation;
+    C1->y[0] = sim->status.time_simulation;
+
     gusto_default_aux(&C0->aux);
     sim->initial_data(&sim->user, &C0->aux, C0->y);
     gusto_complete_aux(&C0->aux);
@@ -584,6 +590,8 @@ void bc_inflow_outflow(struct gusto_sim *sim)
 
     struct mesh_cell *C0 = sim->rows[n].cells;
     struct mesh_cell *C1 = sim->rows[n].cells->prev;
+
+    C0->y[0] = sim->status.time_simulation;
 
     gusto_default_aux(&C0->aux);
     sim->initial_data(&sim->user, &C0->aux, C0->y);

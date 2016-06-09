@@ -7,6 +7,34 @@
 
 
 
+void gusto_source_parameters(double t,
+			     struct gusto_user *user,
+			     struct aux_source_parameters *source)
+{
+  double sig0 = -3;
+  double sig1 = +3;
+  double omg0 = -2;
+  double omg1 = +2;
+  double tsn = 1000;
+
+  if (t < tsn) {
+    source->omega = omg0 + (t/tsn - 0) * (omg1 - omg0);
+    source->sigma = sig0;
+  }
+  else {
+    source->omega = omg1;
+    source->sigma = sig0 + (t/tsn - 1) * (sig1 - sig0);
+  }
+
+  source->entropy = source->sigma + user->entropy;
+  source->omega = pow(10, source->omega);
+  source->sigma = pow(10, source->sigma);
+
+  printf("omega=%3.2e sigma=%3.2e entropy=%f\n", source->omega, source->sigma, source->entropy);
+}
+
+
+
 static const char **id_uniform(struct gusto_user *user,
 			       struct aux_variables *A, double *X)
 {
@@ -40,16 +68,19 @@ const char **id_michel69(struct gusto_user *user,
     return help;
   }
 
+  struct aux_source_parameters source;
+  gusto_source_parameters(X[0], user, &source);
+
   double R = X[1];
   double z = X[3];
   double r = sqrt(R*R + z*z);
   double c = 1.0;
   double Y = 1 - z / sqrt(R*R + z*z);
   double Phi = 1.0;
-  double sig = user->sigma;
+  double sig = source.sigma;
   double eta = pow(sig, 1./3);
   double lam = (pow(1 + eta * eta, 1.5) - 1) / sig;
-  double rL = 1.0; /* light cylinder radius */
+  double rL = 1.0 / source.omega; /* light cylinder radius */
   double r0 = rL * sqrt(sig);
   double Br = Phi / (r * r);
   double xc2 = lam / (1 + sig * lam); /* critical point, xc^2 */
@@ -76,7 +107,7 @@ const char **id_michel69(struct gusto_user *user,
   double bf = (Bf + b0 * uf) / u0;
   double f = Phi * Phi / (4 * M_PI * c * r0 * r0); /* mass rate per steradian */
   double d = f / (r * r * ur);
-  double s = user->entropy; /* log(p / rho^Gamma) */
+  double s = source.entropy; /* log(p / rho^Gamma) */
   double p = exp(s) * pow(d, gamma_law_index);
 
   A->velocity_four_vector[2] = uf;
@@ -86,6 +117,8 @@ const char **id_michel69(struct gusto_user *user,
   A->comoving_mass_density = d;
   A->gas_pressure = p;
   A->flux_function = Y;
+
+  printf("%f %f\n", sig, (Phi*Phi) / (4 * M_PI * f) / (rL * rL));
 
   return NULL;
 }

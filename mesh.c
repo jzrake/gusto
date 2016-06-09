@@ -124,7 +124,7 @@ void gusto_mesh_generate(struct gusto_sim *sim)
     double R1 = sim->user.domain[1];
     double dlogX = log(R1 / R0) / row_size;
 
-    double X = 1.0;
+    double X = R0;
     double R = R0;
     double z = 0.0;
     double dX, dR, dz, dB, Bp;

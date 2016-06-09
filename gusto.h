@@ -57,6 +57,14 @@ struct aux_measure
 } ;
 
 
+struct aux_source_parameters
+{
+  double sigma;
+  double omega;
+  double entropy;
+} ;
+
+
 struct aux_geometry
 {
   double cylindrical_radius;
@@ -176,6 +184,10 @@ double gusto_geometry_step_along_field(struct gusto_sim *sim,
 				       double R, double z,
 				       double *dR, double *dz, double *dB,
 				       double dchi);
+
+void gusto_source_parameters(double t,
+			     struct gusto_user *user,
+			     struct aux_source_parameters *source);
 
 /* General utilities */
 void *gusto_start_clock();
