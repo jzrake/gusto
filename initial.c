@@ -11,26 +11,37 @@ void gusto_source_parameters(double t,
 			     struct gusto_user *user,
 			     struct aux_source_parameters *source)
 {
-  double sig0 = -3;
-  double sig1 = +3;
-  double omg0 = -2;
-  double omg1 = +2;
-  double tsn = 1000;
+  source->sigma = user->sigma;
+  source->omega = user->omega;
+  source->entropy = user->entropy;
+  return;
+
+  double sig0 = log10(user->sigma);
+  double sig1 = log10(user->sigma) + 0;
+  double sig2 = log10(user->sigma) + 8;
+  double omg0 = log10(user->omega);
+  double omg1 = log10(user->omega) + 6;
+  double omg2 = log10(user->omega) + 5;
+  double tsn = 100;
 
   if (t < tsn) {
     source->omega = omg0 + (t/tsn - 0) * (omg1 - omg0);
-    source->sigma = sig0;
+    source->sigma = sig0 + (t/tsn - 0) * (sig1 - sig0);
+  }
+  else if (t < 2 * tsn) {
+    source->omega = omg1 + (t/tsn - 1) * (omg2 - omg1);
+    source->sigma = sig1 + (t/tsn - 1) * (sig2 - sig1);
   }
   else {
-    source->omega = omg1;
-    source->sigma = sig0 + (t/tsn - 1) * (sig1 - sig0);
+    source->omega = omg2;
+    source->sigma = sig2;
   }
 
   source->entropy = source->sigma + user->entropy;
   source->omega = pow(10, source->omega);
   source->sigma = pow(10, source->sigma);
 
-  printf("omega=%3.2e sigma=%3.2e entropy=%f\n", source->omega, source->sigma, source->entropy);
+  /* printf("omega=%3.2e sigma=%3.2e entropy=%f\n", source->omega, source->sigma, source->entropy); */
 }
 
 
@@ -80,7 +91,7 @@ const char **id_michel69(struct gusto_user *user,
   double sig = source.sigma;
   double eta = pow(sig, 1./3);
   double lam = (pow(1 + eta * eta, 1.5) - 1) / sig;
-  double rL = 1.0 / source.omega; /* light cylinder radius */
+  double rL = c / source.omega; /* light cylinder radius */
   double r0 = rL * sqrt(sig);
   double Br = Phi / (r * r);
   double xc2 = lam / (1 + sig * lam); /* critical point, xc^2 */
@@ -118,7 +129,14 @@ const char **id_michel69(struct gusto_user *user,
   A->gas_pressure = p;
   A->flux_function = Y;
 
-  printf("%f %f\n", sig, (Phi*Phi) / (4 * M_PI * f) / (rL * rL));
+  /* struct aux_geometry G; */
+  /* double F[8]; */
+  /* double n[4] = {0, 0, 0, 1}; */
+  /* G.cylindrical_radius = 1; */
+  /* gusto_complete_aux(A); */
+  /* gusto_fluxes(A, &G, n, F); */
+  /* printf("F[TAU]=%3.2e\n", F[TAU]); */
+
 
   return NULL;
 }

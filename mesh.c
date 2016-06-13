@@ -135,8 +135,10 @@ void gusto_mesh_generate(struct gusto_sim *sim)
       Bp = gusto_geometry_step_along_field(sim, R, z, &dR, &dz, &dB, dX);
 
       F = (struct mesh_face *) malloc(sizeof(struct mesh_face));
+      F->y[0] = 0.0;
       F->y[1] = R;
       F->y[3] = z;
+      F->x[0] = 0.0;
       F->x[1] = 1.0;
       F->x[3] = X;
 

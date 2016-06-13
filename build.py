@@ -25,6 +25,7 @@ user_struct = [
     ('fourvel0', 'double', 0.0),
     ('fourvel1', 'double', 0.0),
     ('sigma', 'double', 1.0),
+    ('omega', 'double', 1.0),
     ('validate_geom', 'char', 'x'), # ['x', 'm', 'p']
     ('validate_flux', 'int', 0),
 ]

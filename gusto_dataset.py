@@ -11,6 +11,12 @@ class GustoDataset(object):
     def close(self):
         self.h5f.close()
 
+    def get_user_dict(self):
+        user = self.h5f['user']
+        keys = user.dtype.fields.keys()
+        opts = dict([(k, user[k][0]) for k in keys])
+        return opts
+
     def get_vertex_positions(self):
         """ Return the array: verts[row][col][xyz] """
         verts = [ ]

@@ -5,6 +5,9 @@ import os
 from PySide import QtGui, QtCore
 
 
+GUSTO_HOME = "/Users/jzrake/Work/SuperLuminousSupernovae/gusto"
+
+
 class RunController(QtGui.QWidget):
 
     def __init__(self, parent=None):
@@ -30,7 +33,7 @@ class RunController(QtGui.QWidget):
         output_display.setCurrentFont(font)
 
         base_runcfg = QtGui.QComboBox()
-        for f in os.listdir('.'):
+        for f in os.listdir(GUSTO_HOME):
             if f.endswith('.cfg'):
                 base_runcfg.addItem(f)
 
@@ -61,7 +64,9 @@ class RunController(QtGui.QWidget):
         process = QtCore.QProcess(self)
         self.process = process
         process.finished.connect(self.bld_finished)
+        process.setWorkingDirectory(GUSTO_HOME)
         process.readyReadStandardOutput.connect(self.handle_stdout)
+        process.readyReadStandardError.connect(self.handle_stdout)
         process.start(command, args)
 
 
@@ -73,8 +78,9 @@ class RunController(QtGui.QWidget):
     def handle_run_button(self):
         self.run_button.setEnabled(False)
         self.run_button.setText("Running...")
-        command = "./gusto"
-        base_cfg_file = open(self.base_runcfg.currentText(), 'r')
+        command = os.path.join(GUSTO_HOME, "gusto")
+        cfg_file_name = os.path.join(GUSTO_HOME, self.base_runcfg.currentText())
+        base_cfg_file = open(cfg_file_name, 'r')
         args = [ ]
         args += base_cfg_file.read().split()
         args += self.input_runcfg.toPlainText().split()
@@ -82,7 +88,9 @@ class RunController(QtGui.QWidget):
         process = QtCore.QProcess(self)
         self.process = process
         process.finished.connect(self.run_finished)
+        #process.setWorkingDirectory(GUSTO_HOME)
         process.readyReadStandardOutput.connect(self.handle_stdout)
+        process.readyReadStandardError.connect(self.handle_stdout)
         process.start(command, args)
 
 
@@ -98,11 +106,24 @@ class RunController(QtGui.QWidget):
         scroll.setValue(scroll.maximum())
 
 
+    def set_active_rundir(self, rundir):
+        import glob
+        import gusto_dataset
+
+        chkpts = glob.glob(os.path.join(rundir, '*.h5'))
+        if chkpts:
+            dset = gusto_dataset.GustoDataset(chkpts[0])
+            opts = dset.get_user_dict()
+            inpt = sorted(["%s=%s" % (k, opts[k]) for k in opts])
+            self.input_runcfg.setPlainText('\n'.join(inpt))
+            dset.close()
+
 
 class FileBrowser(QtGui.QWidget):
 
     class Signals(QtCore.QObject):
         file_changed = QtCore.Signal(str)
+        dir_changed = QtCore.Signal(str)
 
     def __init__(self, parent=None):
         super(FileBrowser, self).__init__(parent)
@@ -151,11 +172,13 @@ class FileBrowser(QtGui.QWidget):
     def handle_current_changed(self, index):
         filename = self.model.filePath(index)
         self.current_filename = filename
-        self.signals.file_changed.emit(filename)
         for f in self.watcher.files():
             self.watcher.removePath(f)
         if os.path.isfile(filename):
             self.watcher.addPath(filename)
+            self.signals.file_changed.emit(filename)
+        elif os.path.isdir(filename):
+            self.signals.dir_changed.emit(filename)
 
 
     def current_file_modified(self):
@@ -394,6 +417,7 @@ class MainWindow(QtGui.QWidget):
         plotting_area = PlottingArea()
 
         file_browser.signals.file_changed.connect(plotting_area.set_dset_filename)
+        file_browser.signals.dir_changed.connect(run_controller.set_active_rundir)
 
         columnL = QtGui.QVBoxLayout()
         columnR = QtGui.QVBoxLayout()
