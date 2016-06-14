@@ -10,6 +10,7 @@ struct gusto_user {
     double domain[2];
     char coordinates;
     double cfl;
+    double plm;
     int rk_order;
     char boundary_con[256];
     char initial_data[256];

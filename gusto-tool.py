@@ -19,13 +19,16 @@ class RunController(QtGui.QWidget):
 
         run_button = QtGui.QPushButton('Run')
         bld_button = QtGui.QPushButton('Build')
+        clr_button = QtGui.QPushButton('Clear')
 
         run_button.clicked.connect(self.handle_run_button)
         bld_button.clicked.connect(self.handle_bld_button)
+        clr_button.clicked.connect(self.handle_clr_button)
 
         button_grp = QtGui.QHBoxLayout()
         button_grp.addWidget(run_button)
         button_grp.addWidget(bld_button)
+        button_grp.addWidget(clr_button)
 
         output_display = QtGui.QTextEdit()
         output_display.setReadOnly(True)
@@ -54,25 +57,7 @@ class RunController(QtGui.QWidget):
         self.output_display = output_display
         self.run_button = run_button
         self.bld_button = bld_button
-
-
-    def handle_bld_button(self):
-        self.bld_button.setEnabled(False)
-        self.bld_button.setText("Running...")
-        command = "make"
-        args = [ ]
-        process = QtCore.QProcess(self)
-        self.process = process
-        process.finished.connect(self.bld_finished)
-        process.setWorkingDirectory(GUSTO_HOME)
-        process.readyReadStandardOutput.connect(self.handle_stdout)
-        process.readyReadStandardError.connect(self.handle_stdout)
-        process.start(command, args)
-
-
-    def bld_finished(self, exitCode):
-        self.bld_button.setEnabled(True)
-        self.bld_button.setText("Build")
+        self.clr_button = clr_button
 
 
     def handle_run_button(self):
@@ -94,9 +79,32 @@ class RunController(QtGui.QWidget):
         process.start(command, args)
 
 
+    def handle_bld_button(self):
+        self.bld_button.setEnabled(False)
+        self.bld_button.setText("Running...")
+        command = "make"
+        args = [ ]
+        process = QtCore.QProcess(self)
+        self.process = process
+        process.finished.connect(self.bld_finished)
+        process.setWorkingDirectory(GUSTO_HOME)
+        process.readyReadStandardOutput.connect(self.handle_stdout)
+        process.readyReadStandardError.connect(self.handle_stdout)
+        process.start(command, args)
+
+
+    def handle_clr_button(self):
+        self.output_display.setPlainText('')
+
+
     def run_finished(self, exitCode):
         self.run_button.setEnabled(True)
         self.run_button.setText("Run")
+
+
+    def bld_finished(self, exitCode):
+        self.bld_button.setEnabled(True)
+        self.bld_button.setText("Build")
 
 
     def handle_stdout(self):
@@ -117,6 +125,7 @@ class RunController(QtGui.QWidget):
             inpt = sorted(["%s=%s" % (k, opts[k]) for k in opts])
             self.input_runcfg.setPlainText('\n'.join(inpt))
             dset.close()
+
 
 
 class FileBrowser(QtGui.QWidget):

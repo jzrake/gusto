@@ -14,6 +14,7 @@ user_struct = [
     ('domain', 'double[2]', [1, 10]),
     ('coordinates', 'char', 'p'),
     ('cfl', 'double', 0.5),
+    ('plm', 'double', 1.5),
     ('rk_order', 'int', 2),
     ('boundary_con', 'char[256]', 'inflow_outflow'),
     ('initial_data', 'char[256]', 'michel69'),

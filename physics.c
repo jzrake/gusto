@@ -91,16 +91,16 @@ void gusto_compute_gradient(struct gusto_sim *sim)
 	  x   [n] = C[n]->x[3];
 	  v[0][n] = C[n]->aux.comoving_mass_density;
 	  v[1][n] = C[n]->aux.gas_pressure;
-	  v[2][0] = C[n]->aux.velocity_four_vector[1];
-	  v[3][0] = C[n]->aux.velocity_four_vector[2];
-	  v[4][0] = C[n]->aux.velocity_four_vector[3];
-	  v[5][0] = C[n]->aux.magnetic_four_vector[1];
-	  v[6][0] = C[n]->aux.magnetic_four_vector[2];
-	  v[7][0] = C[n]->aux.magnetic_four_vector[3];
+	  v[2][n] = C[n]->aux.velocity_four_vector[1];
+	  v[3][n] = C[n]->aux.velocity_four_vector[2];
+	  v[4][n] = C[n]->aux.velocity_four_vector[3];
+	  v[5][n] = C[n]->aux.magnetic_four_vector[1];
+	  v[6][n] = C[n]->aux.magnetic_four_vector[2];
+	  v[7][n] = C[n]->aux.magnetic_four_vector[3];
 	}
 
 	for (int q=0; q<8; ++q) {
-	  w[q] = __plm_minmod(x, v[q], 2.0);
+	  w[q] = __plm_minmod(x, v[q], sim->user.plm);
 	}
 
 	C0->aux_gradient.comoving_mass_density   = w[0];
@@ -128,24 +128,42 @@ void gusto_compute_fluxes(struct gusto_sim *sim)
       struct mesh_cell *CL = F->cells[0];
       struct mesh_cell *CR = F->cells[1];
       struct aux_variables AL, AR;
-      struct aux_geometry GL, GR;
-      double vpar = 0.0;
 
-      if (CL && CR) {
-	AL = CL->aux; GL = CL->geom;
-	AR = CR->aux; GR = CR->geom;
-      }
-      else if (CL) {
-	AL = CL->aux; GL = CL->geom;
-	AR = CL->aux; GR = CL->geom;
-      }
-      else if (CR) {
-	AL = CR->aux; GL = CR->geom;
-	AR = CR->aux; GR = CR->geom;
-      }
+      if (CL == NULL) CL = CR;
+      if (CR == NULL) CR = CL;
+
+      double vpar = 0.0;
+      double dxL = F->x[3] - CL->x[3];
+      double dxR = F->x[3] - CR->x[3];
+
+#define EXTRAPL(f) AL.f = CL->aux.f + CL->aux_gradient.f * dxL;
+#define EXTRAPR(f) AR.f = CR->aux.f + CR->aux_gradient.f * dxR;
+
+      EXTRAPL(comoving_mass_density);
+      EXTRAPR(comoving_mass_density);
+      EXTRAPL(gas_pressure);
+      EXTRAPR(gas_pressure);
+      EXTRAPL(velocity_four_vector[1]);
+      EXTRAPR(velocity_four_vector[1]);
+      EXTRAPL(velocity_four_vector[2]); /* azimuthal velocity */
+      EXTRAPR(velocity_four_vector[2]);
+      EXTRAPL(velocity_four_vector[3]); /* poloidal velocity */
+      EXTRAPR(velocity_four_vector[3]);
+      EXTRAPL(magnetic_four_vector[1]);
+      EXTRAPR(magnetic_four_vector[1]);
+      EXTRAPL(magnetic_four_vector[2]); /* azimuthal field */
+      EXTRAPR(magnetic_four_vector[2]);
+      EXTRAPL(magnetic_four_vector[3]); /* poloidal field */
+      EXTRAPR(magnetic_four_vector[3]);
+
+      gusto_complete_aux(&AL);
+      gusto_complete_aux(&AR);
+
+#undef EXTRAPL
+#undef EXTRAPRR
 
       double nhat[4] = {0, 0, 0, 1};
-      gusto_riemann(&AL, &AR, &GL, &GR, &F->geom, nhat, F->Fhat, vpar);
+      gusto_riemann(&AL, &AR, &F->geom, &F->geom, &F->geom, nhat, F->Fhat, vpar);
 
     }
   }
@@ -649,14 +667,22 @@ void bc_inflow_outflow(struct gusto_sim *sim)
   for (int n=0; n<sim->num_rows; ++n) {
 
     struct mesh_cell *C0 = sim->rows[n].cells;
+    struct mesh_cell *Ci = sim->rows[n].cells->next;
     struct mesh_cell *C1 = sim->rows[n].cells->prev;
 
+    /* We assign values to the first two zones, so that the gradient is
+       correctly esimated there. */
     C0->y[0] = sim->status.time_simulation;
-
     gusto_default_aux(&C0->aux);
     sim->initial_data(&sim->user, &C0->aux, C0->y);
     gusto_complete_aux(&C0->aux);
     gusto_to_conserved(&C0->aux, &C0->geom, C0->U, C0->dA);
+
+    Ci->y[0] = sim->status.time_simulation;
+    gusto_default_aux(&Ci->aux);
+    sim->initial_data(&sim->user, &Ci->aux, Ci->y);
+    gusto_complete_aux(&Ci->aux);
+    gusto_to_conserved(&Ci->aux, &Ci->geom, Ci->U, Ci->dA);
 
     gusto_default_aux(&C1->aux);
     C1->aux = C1->prev->aux;
