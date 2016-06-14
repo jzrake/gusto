@@ -8,6 +8,8 @@
 #include "quartic.h"
 
 
+static inline double __plm_minmod(double v[3], double x[3], double plm_theta);
+
 
 void gusto_initial_data(struct gusto_sim *sim)
 {
@@ -54,6 +56,64 @@ int gusto_validate_fluxes(struct gusto_sim *sim)
   }
 
   return 0;
+}
+
+
+
+void gusto_compute_gradient(struct gusto_sim *sim)
+{
+  struct mesh_cell *CL, *C0, *CR;
+
+  for (int n=0; n<sim->num_rows; ++n) {
+    DL_FOREACH(sim->rows[n].cells, C0) {
+
+      CL = C0->prev;
+      CR = C0->next;
+
+      if (CL->next == NULL || /* first */
+	  C0->next == NULL) { /* last */
+	C0->aux_gradient.velocity_four_vector[1] = 0.0;
+	C0->aux_gradient.velocity_four_vector[2] = 0.0;
+	C0->aux_gradient.velocity_four_vector[3] = 0.0;
+	C0->aux_gradient.magnetic_four_vector[1] = 0.0;
+	C0->aux_gradient.magnetic_four_vector[2] = 0.0;
+	C0->aux_gradient.magnetic_four_vector[3] = 0.0;
+	C0->aux_gradient.comoving_mass_density = 0.0;
+	C0->aux_gradient.gas_pressure = 0.0;
+      }
+      else {
+	struct mesh_cell *C[3] = {CL, C0, CR};
+	double x[3];
+	double w[8];    /* aux vars gradient */
+	double v[8][3]; /* aux vars */
+
+	for (int n=0; n<3; ++n) {
+	  x   [n] = C[n]->x[3];
+	  v[0][n] = C[n]->aux.comoving_mass_density;
+	  v[1][n] = C[n]->aux.gas_pressure;
+	  v[2][0] = C[n]->aux.velocity_four_vector[1];
+	  v[3][0] = C[n]->aux.velocity_four_vector[2];
+	  v[4][0] = C[n]->aux.velocity_four_vector[3];
+	  v[5][0] = C[n]->aux.magnetic_four_vector[1];
+	  v[6][0] = C[n]->aux.magnetic_four_vector[2];
+	  v[7][0] = C[n]->aux.magnetic_four_vector[3];
+	}
+
+	for (int q=0; q<8; ++q) {
+	  w[q] = __plm_minmod(x, v[q], 2.0);
+	}
+
+	C0->aux_gradient.comoving_mass_density   = w[0];
+	C0->aux_gradient.gas_pressure            = w[1];
+	C0->aux_gradient.velocity_four_vector[1] = w[2];
+	C0->aux_gradient.velocity_four_vector[2] = w[3];
+	C0->aux_gradient.velocity_four_vector[3] = w[4];
+	C0->aux_gradient.magnetic_four_vector[1] = w[5];
+	C0->aux_gradient.magnetic_four_vector[2] = w[6];
+	C0->aux_gradient.magnetic_four_vector[3] = w[7];
+      }
+    }
+  }
 }
 
 
@@ -639,4 +699,21 @@ OpBoundaryCon gusto_lookup_boundary_con(const char *user_key)
   } while (1);
   printf("[gusto] ERROR: no such boundary_con=%s\n", user_key);
   return NULL;
+}
+
+
+
+
+
+
+#define SGN(x) (((x)>0)-((x)<0))
+#define MIN(x) gusto_min3(x[0], x[1], x[2])
+
+double __plm_minmod(double x[3], double v[3], double plm_theta)
+{
+  const double a = (v[1] - v[0]) / (x[1] - x[0]) * plm_theta;
+  const double b = (v[2] - v[0]) / (x[2] - x[0]);
+  const double c = (v[2] - v[1]) / (x[2] - x[1]) * plm_theta;
+  const double fabc[3] = { fabs(a), fabs(b), fabs(c) };
+  return 0.25*abs(SGN(a)+SGN(b))*(SGN(a)+SGN(c))*MIN(fabc);
 }

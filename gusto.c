@@ -64,10 +64,11 @@ void gusto_print_help(struct gusto_sim *sim)
 void gusto_advance_rk(struct gusto_sim *sim, double dt, double rkparam)
 {
   /*
-   * Evaluate derived data associated with the input state, namely Godunov
+   * Evaluate derived data associated with the input state - gradients, Godunov
    * fluxes.
    * ---------------------------------------------------------------------------
    */
+  gusto_compute_gradient(sim);
   gusto_compute_fluxes(sim);
 
   /*

@@ -92,7 +92,7 @@ double gusto_geometry_step_along_field(struct gusto_sim *sim,
 				     double *dR, double *dz, double *dB,
 				     double dchi)
 /*
- * Take an RK4 step along the field line. Return the poloidal field strenth at
+ * Take an RK4 step along the field line. Return the poloidal field strength at
  * the beginning of the step.
  *
  */

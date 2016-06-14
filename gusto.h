@@ -101,6 +101,7 @@ struct mesh_cell
   double dA[4];   /* conversion factors for conserved masses and densities */
   char cell_type;
   struct aux_variables aux;
+  struct aux_variables aux_gradient; /* stores dA/dx as computed by PLM */
   struct aux_geometry geom;
   struct mesh_face *faces[2];
   struct mesh_cell *next;
@@ -138,6 +139,7 @@ int gusto_validate_fluxes(struct gusto_sim *sim);
 int gusto_validate_geometry(struct gusto_sim *sim);
 void gusto_recover_variables(struct gusto_sim *sim);
 void gusto_initial_data(struct gusto_sim *sim);
+void gusto_compute_gradient(struct gusto_sim *sim);
 void gusto_compute_fluxes(struct gusto_sim *sim);
 void gusto_compute_face_magnetic_flux(struct gusto_sim *sim);
 void gusto_compute_cell_field_from_faces(struct gusto_sim *sim);
